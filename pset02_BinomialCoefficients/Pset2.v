@@ -118,14 +118,30 @@ Module Impl.
   (* Exercise: Define a simple exponentiation function in the same style, so that
      "exp base n" equals "base^n". *)
 
-  Definition exp(base: N): N -> N. Admitted.
+  Definition exp(base: N): N -> N :=
+    recurse by cases
+    | 0 => 1
+    | n + 1 => base * recurse
+    end.
 
   (* Once you define "exp", you can replace "Admitted." below by "Proof. equality. Qed." *)
-  Lemma test_exp_2_3: exp 2 3 = 8. Admitted.
-  Lemma test_exp_3_2: exp 3 2 = 9. Admitted.
-  Lemma test_exp_4_1: exp 4 1 = 4. Admitted.
-  Lemma test_exp_5_0: exp 5 0 = 1. Admitted.
-  Lemma test_exp_1_3: exp 1 3 = 1. Admitted.
+  Lemma test_exp_2_3: exp 2 3 = 8.
+  Proof.
+    equality.
+  Qed.
+
+  Lemma test_exp_3_2: exp 3 2 = 9.
+  Proof.
+    equality.
+  Qed.
+
+  Lemma test_exp_4_1: exp 4 1 = 4.
+  Proof.
+    equality.
+  Qed.
+
+  Lemma test_exp_5_0: exp 5 0 = 1. Proof. equality. Qed.
+  Lemma test_exp_1_3: exp 1 3 = 1. Proof. equality. Qed.
 
   (* Here's another recursive function defined in the same style to apply a
      function f to a range of values:
@@ -134,7 +150,7 @@ Module Impl.
     recurse by cases
     | 0 => fun start => []
     | n + 1 => fun start => f start :: recurse (start + 1)
-    end.
+  end.
 
   Compute (seq (fun x => x * x) 4 10).
 
@@ -153,7 +169,7 @@ Module Impl.
                                   | h :: t => recurse t
                                   | nil => 0
                                   end
-    end.
+  end.
 
   (* The standard library already contains a function called "length": *)
   Check length.
@@ -214,13 +230,35 @@ Module Impl.
   Lemma seq_spec: forall f count i start, i < count -> ith i (seq f count start) = f (start + i).
   Proof.
     induct count; simplify.
-  Admitted.
+    - linear_arithmetic.
+    - unfold_recurse (seq f) count.
+      cases i. simplify.
+      f_equal. linear_arithmetic.
+      unfold_recurse ith (i).
+      assert (i < count).
+      linear_arithmetic.
+      replace (start + (i + 1)) with (start + 1 + i) by linear_arithmetic.
+      eapply IHcount in H0.
+      apply H0.
+  Qed.
 
   (* Exercise: Prove that if the index is out of bounds, "ith" returns 0. *)
   Lemma ith_out_of_bounds_0: forall i l, len l <= i -> ith i l = 0.
   Proof.
+    induct i; simplify.
+    cases l. equality.
+    unfold len in H.
+    admit.
+    unfold_recurse ith (i).
+    cases l.
+    equality.
+    replace (len (n :: l)) with (1 + (len l)) in H.
+    assert (len l <= i).
+    linear_arithmetic.
+    apply IHi in H0.
+    assumption.
+    equality.
   Admitted.
-
 
   (* Binomial coefficients *)
   (* ********************* *)
@@ -262,7 +300,7 @@ Module Impl.
     recurse by cases
     | 0 => 1
     | k + 1 => recurse * (n - k) / (k + 1)
-    end.
+  end.
 
   (* Now if we do
 
@@ -298,7 +336,7 @@ Module Impl.
     (* which outputs the name of a handy lemma we can apply: *)
     apply N.neq_mul_0.
     split; assumption.
-    (* (Note that in this case "nia" would have worked as well, but in any case, it's good to know
+  (* (Note that in this case "nia" would have worked as well, but in any case, it's good to know
        the "Search" command.) *)
   Qed.
 
@@ -318,16 +356,37 @@ Module Impl.
 
   Lemma fact_nonzero: forall n, n! <> 0.
   Proof.
-  Admitted.
+    induct n; simplify.
+    linear_arithmetic.
+    unfold_recurse fact (n).
+    linear_arithmetic.
+  Qed.
 
   Lemma Cn0: forall n, C n 0 = 1.
   Proof.
-  Admitted.
+    induct n; simplify.
+    equality.
+    unfold C. simplify.
+    replace (n + 1 - 0) with (n + 1).
+    replace ((n + 1)! * 1) with ((n + 1)!).
+    eapply N.div_same.
+    apply fact_nonzero.
+    linear_arithmetic.
+    linear_arithmetic.
+  Qed.
 
   Lemma Cnn: forall n, C n n = 1.
   Proof.
-  Admitted.
-
+    induct n; simplify.
+    equality.
+    unfold C.
+    replace ((n + 1 - (n + 1))!) with (1).
+    replace (1 * (n + 1)!) with ((n + 1)!) by linear_arithmetic.
+    apply N.div_same.
+    apply fact_nonzero.
+    replace (n + 1 - (n + 1)) with (0) by linear_arithmetic.
+    equality.
+  Qed.
 
   (* It's somewhat surprising that in the definition of C(n, k),
 
@@ -340,8 +399,7 @@ Module Impl.
     provide the solution for you, so that you can step through it and use it as a
     source of useful strategies you can apply in the exercises below.  Make sure
     to step through it and to understand each proof step! *)
-  Lemma C_is_integer: forall n k, k <= n ->
-      (((n - k)! * k!) | n!).
+  Lemma C_is_integer: forall n k, k <= n -> (((n - k)! * k!) | n!).
   Proof.
     induct n; simplify.
 
@@ -393,7 +451,7 @@ Module Impl.
         (* The second is missing a (k) factor *)
         apply N.mul_divide_mono_l with (p := k) in Hdk1.
         replace (n - (k - 1)) with (n + 1 - k) in Hdk1
-          by linear_arithmetic.
+            by linear_arithmetic.
         replace (k * ((n + 1 - k)! * (k - 1)!))
           with ((n + 1 - k)! * k!) in Hdk1; cycle 1.
         { replace k with (k - 1 + 1) at 2 by linear_arithmetic.
@@ -464,9 +522,20 @@ Module Impl.
   Here we go: *)
   Lemma bcoeff_correct: forall n k, k <= n -> bcoeff n k = C n k.
   Proof.
-    induct k; simplify.
+    induct n; simplify.
+    - replace k with 0 by linear_arithmetic.
+      equality.
+    - cases k.
+      unfold C.
+      unfold bcoeff. simplify.
+      replace (n + 1 - 0) with (n + 1) by linear_arithmetic.
+      replace ((n + 1)! * 1) with ((n + 1)!).
+      symmetry.
+      apply N.div_same.
+      apply fact_nonzero.
+      linear_arithmetic.
+      admit.
   Admitted.
-
 
   (* All binomial coefficients for a given n *)
   (* *************************************** *)
@@ -480,8 +549,8 @@ Module Impl.
 
   Definition all_coeffs_slow1(n: N): list N :=
     (recurse by cases
-     | 0 => [1]
-     | k + 1 => C n (k + 1) :: recurse
+    | 0 => [1]
+    | k + 1 => C n (k + 1) :: recurse
      end) n.
 
   Compute all_coeffs_slow1 0.
@@ -500,8 +569,8 @@ Module Impl.
   (* We could use our more efficient bcoeff from above: *)
   Definition all_coeffs_slow2(n: N): list N :=
     (recurse by cases
-     | 0 => [1]
-     | k + 1 => bcoeff n (k + 1) :: recurse
+    | 0 => [1]
+    | k + 1 => bcoeff n (k + 1) :: recurse
      end) n.
 
   Compute all_coeffs_slow2 5.
@@ -550,7 +619,7 @@ Module Impl.
     recurse by cases
     | 0 => [1]
     | n + 1 => nextLine recurse
-    end.
+  end.
 
   (* Time Compute all_coeffs_fast 200. takes 0.35s on my computer *)
 
@@ -563,6 +632,10 @@ Module Impl.
       k <= n ->
       ith k (all_coeffs_fast n) = C n k.
   Proof.
+    induct n; simplify.
+    - replace k with 0 by linear_arithmetic.
+      equality.
+    -
   Admitted.
 
   (* ----- THIS IS THE END OF PSET2 ----- All exercises below this line are optional. *)
@@ -594,7 +667,7 @@ Module Impl.
     (n - k + 1)! k!
 
   = C(n+1, k)
-  *)
+   *)
   Lemma Pascal's_rule_holds: Pascal's_rule.
   Proof.
     unfold Pascal's_rule.
@@ -668,7 +741,7 @@ Notation "x !" := (fact x) (at level 12, format "x !"). (* local in Pset2 *)
    through it all at once.  *)
 
 (* The tactic we introduce in each example is underlined like this. *)
-                                             (********************)
+(********************)
 
 Parameter whatever: Prop.
 
@@ -679,7 +752,7 @@ Goal forall (P Q R: Prop) (H1: P) (H2: Q) (IH: P -> Q -> R), R.
 Proof.
   simplify.
   apply IH.
- (********)
+  (********)
 Abort.
 
 (* Apply works with implications (`A -> B`) but also with equivalences, where
@@ -694,7 +767,7 @@ Proof.
   (* Here, Coq wants to know the value of ‘p’ before it can apply the lemma; so,
      we use the ‘with’ for of ‘apply’ to supply it: *)
   apply N.mul_cancel_r with (p := n - k + 1).
- (****)               (****)
+  (****)               (****)
 Abort.
 
 (* Apply also works in hypotheses, where it turns premises into conclusions: *)
@@ -702,7 +775,7 @@ Goal forall (n m k: N), n = m -> whatever.
 Proof.
   simplify.
   apply N.mul_cancel_r with (p := n - k + 1) in H.
- (*****)              (****)                (**)
+  (*****)              (****)                (**)
 Abort.
 
 Goal forall (n m k: N), n - k + 1 <> 0 -> n = m -> whatever.
@@ -712,7 +785,7 @@ Proof.
   (* Specifying parameters by hand is not always convenient, so we can ask Coq
      to create placeholders instead, to be filled later: *)
   eapply N.mul_cancel_r in H0.
- (******)              (**)
+  (******)              (**)
   2: { (* This ‘2:’ notation means: operate on the second goal *)
     apply H.
   } (* … and the curly braces delimit a subproof. *)
@@ -722,12 +795,12 @@ Goal forall (P Q R S: Prop), (P -> S) -> (R -> S) -> P \/ Q \/ R -> S.
 Proof.
   simplify.
   cases H1. (* You are familiar with ‘cases’ from pset 1. *)
- (*****)
+  (*****)
   - apply H. apply H1.
   - admit. (* ‘admit’ is just like ‘Admitted’ but for a single goal *)
-   (*****)
+  (*****)
   - apply H0. apply H1.
-Fail Qed. (* But if you use ‘admit’, no ‘Qed’ for you! *)
+    Fail Qed. (* But if you use ‘admit’, no ‘Qed’ for you! *)
 Admitted.
 
 (* Here is a convenient pattern that you will be familiar with from math
@@ -735,26 +808,26 @@ Admitted.
    as part of a larger proof. *)
 
 Goal forall (f : N -> N) (count : N)
-       (IHcount : forall i start : N, i < count ->
-                                 ith i (seq f count start) = f (start + i))
-       (i start : N)
-       (H : i < count + 1),
-  ith i (f start :: seq f count (start + 1)) = f (start + i).
+            (IHcount : forall i start : N, i < count ->
+                                           ith i (seq f count start) = f (start + i))
+            (i start : N)
+            (H : i < count + 1),
+    ith i (f start :: seq f count (start + 1)) = f (start + i).
 Proof.
   simplify.
 
   (* ‘assert’ introduces the fact that we want to prove, then uses *)
   assert (i = 0 \/ 0 < i) as A. { (* the ‘as’ clause to name the resulting fact *)
- (******)                (**)
+    (******)                (**)
     linear_arithmetic.          (* The proof of the lemma comes first. *)
   }
   cases A.                      (* Then we get to use the lemma itself. *)
   - subst. (* ‘subst’ rewrites all equalities. *)
-   (*****)  (* or "subst i" for just one var *)
+    (*****)  (* or "subst i" for just one var *)
     simplify. admit.
   - (* Another assertion! This time we fit the whole proof in a ‘by’ clause. *)
     assert (i = i - 1 + 1) as E by linear_arithmetic.
-   (******)                    (**)
+    (******)                    (**)
     rewrite E.
     unfold_recurse ith (i - 1).
 Abort.
@@ -766,7 +839,7 @@ Goal forall (n x0 k: N),
     whatever.
 Proof.
   intros n m.
- (******)
+  (******)
   (* ‘simplify’ takes care of moving variables into the “context” above the
      line, but ‘intros’ gives finer grained control and lets you name
      hypotheses.  Users of Proof General with company-coq can type ‘intros!’ to
@@ -778,7 +851,7 @@ Proof.
      is the perfect tactic for these cases; it's like ‘assert’ followed by
      ‘rewrite’. *)
   replace (n - (k - 1)) with (n - k + 1) in H1 by linear_arithmetic.
- (*******)             (****)           (**)  (**)
+  (*******)             (****)           (**)  (**)
   (* "in" and "by" are optional *)
   unfold_recurse fact (n - k).
 Abort.
@@ -789,7 +862,7 @@ Proof.
   (* Often you have a general hypothesis, and you want to make it more specific
      to your case.  Then, ‘specialize’ is the tactic you want: *)
   specialize H with (b := x).
- (**********) (****)
+  (**********) (****)
   assert (3 < x) by admit.
   specialize H with (2 := H0) (3 := H1).
 Abort.
@@ -804,7 +877,7 @@ Proof.
      equality and replaces matching subterms of the goal according to that
      equality: *)
   rewrite N.add_0_r.
- (*******)
+  (*******)
   (* Options like "with (a := 2)", "in H", "by tactic" also work! *)
   equality.
 Abort.
@@ -816,7 +889,7 @@ Proof.
   (* Alternatively, sometimes, it helps to apply the principle that, if two
      function arguments match, then the function calls themselves match: *)
   f_equal.
- (*******)
+  (*******)
   linear_arithmetic.
 Abort.
 
@@ -845,7 +918,7 @@ Proof.
      that and then substitutes the equalities.  It's also particularly useful
      for inductive ‘Prop’s, which we will see later in this class. *)
   invert H. (* Watch what happens carefully in this example *)
- (******)
+  (******)
   invert H0.
   equality.
 Abort.
@@ -857,7 +930,7 @@ Goal forall (A B: Type) (f: A -> B) (a1 a2 a3: A),
 Proof.
   simplify.
   equality. (* Of course, ‘equality’ can do all the work for us here. *)
- (********)
+  (********)
 Abort.
 
 Goal forall (a1 a2 b1 b2: N) (l1 l2: list N),
@@ -867,7 +940,7 @@ Proof.
   simplify.
   (* ‘invert’ works at arbitrary depth, btw: *)
   invert H.
- (******)
+  (******)
 Abort.
 
 (* If you ever end up with contradictory hypotheses, you'll want to apply the
@@ -882,7 +955,7 @@ Proof.
   simplify.
   assert (a < b \/ b <= a) as C by linear_arithmetic. cases C.
   - exfalso.
-   (*******)
+    (*******)
     unfold not in H.
     apply H.
     all: assumption.
@@ -895,7 +968,7 @@ Goal forall (a : N) (l : list N),
 Proof.
   simplify.
   discriminate.
- (************)
+  (************)
 Abort.
 
 Goal forall (P Q R S T: Prop), (P \/ Q -> T) -> (R \/ S -> T) -> P \/ S -> T.
@@ -918,10 +991,10 @@ Abort.
    - trivial
    - transitivity
    - symmetry
-*)
+ *)
 
 (* References:
 
    - FRAP book Appendix A.2. Tactic Reference (http://adam.chlipala.net/frap/frap_book.pdf)
    - Coq Reference Manual, Chapter on Tactics (https://coq.inria.fr/refman/proof-engine/tactics.html)
-*)
+ *)
