@@ -242,13 +242,20 @@ Module Impl.
       apply H0.
   Qed.
 
+  Lemma len_nonempty_is_nonzero: forall l n, len (n :: l) > 0.
+  Proof.
+    induct l. simplify.
+    linear_arithmetic.
+    unfold len. linear_arithmetic.
+  Qed.
+
   (* Exercise: Prove that if the index is out of bounds, "ith" returns 0. *)
   Lemma ith_out_of_bounds_0: forall i l, len l <= i -> ith i l = 0.
   Proof.
     induct i; simplify.
     cases l. equality.
-    unfold len in H.
-    admit.
+    assert (len (n :: l) > 0) by apply len_nonempty_is_nonzero.
+    contradiction.
     unfold_recurse ith (i).
     cases l.
     equality.
@@ -258,7 +265,7 @@ Module Impl.
     apply IHi in H0.
     assumption.
     equality.
-  Admitted.
+  Qed.
 
   (* Binomial coefficients *)
   (* ********************* *)
@@ -520,21 +527,50 @@ Module Impl.
      "a / b * c / d" is "((a / b) * c) / d", NOT "(a / b) * (c / d)"
 
   Here we go: *)
-  Lemma bcoeff_correct: forall n k, k <= n -> bcoeff n k = C n k.
+  Lemma fact_division: forall n, n >= 1 -> n = n! / (n - 1)!.
   Proof.
     induct n; simplify.
-    - replace k with 0 by linear_arithmetic.
-      equality.
-    - cases k.
-      unfold C.
-      unfold bcoeff. simplify.
-      replace (n + 1 - 0) with (n + 1) by linear_arithmetic.
-      replace ((n + 1)! * 1) with ((n + 1)!).
+    contradiction.
+    unfold_recurse fact (n).
+    replace (n + 1 - 1) with (n) by linear_arithmetic.
+    replace ((n + 1) * n! / n!) with ((n + 1) * (n! / n!)).
+    replace (n! / n!) with (1).
+    linear_arithmetic.
+    symmetry. apply N.div_same.
+    apply fact_nonzero.
+    rewrite N.div_mul.
+    rewrite N.div_same.
+    linear_arithmetic.
+    apply fact_nonzero.
+    apply fact_nonzero.
+  Qed.
+
+  Lemma bcoeff_correct: forall n k, k <= n -> bcoeff n k = C n k.
+  Proof.
+    induct k; simplify.
+    symmetry.
+    - apply Cn0.
+    - assert (k = 0 \/ k = n + 1 \/ 0 < k <= n) as Hk by linear_arithmetic;
+        cases Hk; subst; simplify.
+      replace (n - 0) with (n) by linear_arithmetic.
+      replace (0 + 1) with (1) by linear_arithmetic.
+      replace (1 * n) with (n) by linear_arithmetic.
+      replace (n / 1) with (n). unfold C. simplify.
+      replace (0 + 1) with (1) by linear_arithmetic.
+      replace (1 * 1) with (1) by linear_arithmetic.
+      replace ((n - 1)! * 1) with ((n - 1)!) by linear_arithmetic.
+      apply fact_division.
+      apply N.le_ge in H.
+      apply H.
       symmetry.
-      apply N.div_same.
-      apply fact_nonzero.
+      apply N.div_1_r.
+      replace (n + 1 + 1) with (n + 2) in H by linear_arithmetic.
+      replace (n + 2 <= n) with (2 <= 0) in H.
+      contradiction.
       linear_arithmetic.
-      admit.
+      symmetry.
+      unfold C.
+      replace ((k + 1)!) with ((k + 1) * k!).
   Admitted.
 
   (* All binomial coefficients for a given n *)
@@ -626,6 +662,23 @@ Module Impl.
   (* Exercise: Let's prove that all_coeffs_fast is correct.
      Note that you can assume Pascal's rule to prove this. *)
   (* HINT 1 (see Pset2Sig.v) *)
+
+  Lemma all_coeffs_fast_len: forall n, len (all_coeffs_fast n) = n + 1.
+  Proof.
+    induct n; simplify.
+    equality.
+    unfold_recurse all_coeffs_fast (n).
+    simplify.
+    replace (len (all_coeffs_fast n)) with (n + 1).
+    replace (len (seq (fun k : N => ith (k - 1)
+                  (all_coeffs_fast n) + ith k (all_coeffs_fast n))
+                      (n + 1) 1)) with (n + 1).
+    linear_arithmetic.
+    Search (len).
+    symmetry.
+    apply seq_len.
+  Qed.
+
   Lemma all_coeffs_fast_correct:
     Pascal's_rule ->
     forall n k,
@@ -633,10 +686,46 @@ Module Impl.
       ith k (all_coeffs_fast n) = C n k.
   Proof.
     induct n; simplify.
-    - replace k with 0 by linear_arithmetic.
-      equality.
-    -
-  Admitted.
+    assert (k = 0) by linear_arithmetic.
+    replace (k) with 0 by H1.
+    simplify. symmetry. apply Cnn.
+    assert (k = 0 \/ k = n + 1 \/ 0 < k <= n) as Hk by linear_arithmetic;
+      cases Hk; subst; simplify.
+    unfold_recurse all_coeffs_fast (n). simplify.
+    symmetry. apply Cn0.
+    unfold_recurse ith (n).
+    unfold_recurse all_coeffs_fast (n). simplify.
+    assert (len (all_coeffs_fast n) = n + 1).
+    cases n. simplify.
+    equality.
+    apply all_coeffs_fast_len.
+    rewrite -> seq_spec.
+    replace (1 + n - 1) with (n) by linear_arithmetic.
+    rewrite -> IHn.
+    rewrite ith_out_of_bounds_0.
+    rewrite -> Cnn.
+    symmetry.
+    apply Cnn.
+    rewrite H1.
+    linear_arithmetic.
+    linear_arithmetic.
+    rewrite H1.
+    linear_arithmetic.
+    unfold_recurse all_coeffs_fast(n). simplify.
+    replace (k) with (k - 1 + 1) by linear_arithmetic.
+    unfold_recurse ith (k - 1). simplify.
+    rewrite -> seq_spec.
+    replace (1 + (k - 1)) with (k) by linear_arithmetic.
+    rewrite IHn.
+    rewrite IHn.
+    replace (k - 1 + 1) with (k) by linear_arithmetic.
+    symmetry. apply H.
+    linear_arithmetic.
+    linear_arithmetic.
+    linear_arithmetic.
+    rewrite all_coeffs_fast_len.
+    linear_arithmetic.
+  Qed.
 
   (* ----- THIS IS THE END OF PSET2 ----- All exercises below this line are optional. *)
 
