@@ -91,7 +91,7 @@ Module Impl.
     recurse by cases
     | 0 => 1
     | n + 1 => (n + 1) * recurse
-    end.
+  end.
 
   (* The above function implements factorial, i.e. "fact n = 1 * 2 * ... * n".  In
      the recursive case, you can use the word "recurse" to refer to the result of
@@ -102,7 +102,7 @@ Module Impl.
 
   Close Scope N_recursion_scope.
   Print fact.
-  *)
+   *)
 
   (* Let's compute the first few values of fact: *)
   Compute fact 0.
@@ -122,7 +122,7 @@ Module Impl.
     recurse by cases
     | 0 => 1
     | n + 1 => base * recurse
-    end.
+  end.
 
   (* Once you define "exp", you can replace "Admitted." below by "Proof. equality. Qed." *)
   Lemma test_exp_2_3: exp 2 3 = 8.
@@ -162,13 +162,13 @@ Module Impl.
   Definition ith: N -> list N -> N :=
     recurse by cases
     | 0 => fun (l: list N) => match l with
-                              | h :: t => h
+                          | h :: t => h
+                          | nil => 0
+                          end
+    | i + 1 => fun (l: list N) => match l with
+                              | h :: t => recurse t
                               | nil => 0
                               end
-    | i + 1 => fun (l: list N) => match l with
-                                  | h :: t => recurse t
-                                  | nil => 0
-                                  end
   end.
 
   (* The standard library already contains a function called "length": *)
@@ -545,6 +545,12 @@ Module Impl.
     apply fact_nonzero.
   Qed.
 
+  Lemma mul_nonzero: forall n k, n <> 0 /\ k <> 0 -> n * k <> 0.
+  Proof.
+    intros.
+    linear_arithmetic.
+  Qed.
+
   Lemma bcoeff_correct: forall n k, k <= n -> bcoeff n k = C n k.
   Proof.
     induct k; simplify.
@@ -571,7 +577,105 @@ Module Impl.
       symmetry.
       unfold C.
       replace ((k + 1)!) with ((k + 1) * k!).
-  Admitted.
+      replace (n - (k + 1)) with (n - k - 1) by linear_arithmetic.
+      replace (n! / ((n - k - 1)! * ((k + 1) * k!)))
+        with ((n! * (n - k)) / ((n - k - 1)! * (n - k) * k! * (k + 1))).
+      replace (n - k) with (n - k - 1 + 1).
+      replace (n - k - 1 + 1 - 1) with (n - k - 1) by linear_arithmetic.
+      replace ((n - k - 1)! * (n - k - 1 + 1)) with ((n - k - 1 + 1)!).
+      replace (n - k - 1 + 1) with (n - k) by linear_arithmetic.
+      replace (n! * (n - k) / ((n - k)! * k! * (k + 1))) with (n! / ((n - k)! * k!) * (n - k) / (k + 1)).
+      replace (n! / ((n - k)! * k!)) with (C n k) by equality.
+      symmetry.
+      rewrite <- IHk.
+      unfold_recurse (bcoeff n) k.
+      equality.
+      linear_arithmetic.
+      remember (n - k).
+      remember (k + 1).
+      replace (n! * n0 / (n0! * k! * n1)) with (n! * n0 / (n0! * k!) / n1).
+      replace (n! * n0 / (n0! * k!) / n1) with (n! / (n0! * k!) * n0 / n1).
+      equality.
+      Focus 2.
+      apply N.div_div.
+      eapply mul_nonzero.
+      split. apply fact_nonzero.
+      apply fact_nonzero.
+      linear_arithmetic.
+      Focus 2.
+      remember (n - k - 1).
+      unfold_recurse fact (n0).
+      linear_arithmetic.
+      Focus 2.
+      linear_arithmetic.
+      Focus 3.
+      unfold_recurse fact (k).
+      equality.
+      Focus 2.
+      remember (n - k - 1).
+      replace (n0! * (n - k) * k! * (k + 1)) with (n0! * k! * (k + 1) * (n - k)).
+      remember (n0! * k! * (k + 1)).
+      remember (n! * (n - k)).
+      replace (n2 / (n1 * (n - k))) with (n2 / n1 / (n - k)).
+      rewrite Heqn2.
+      Focus 3.
+      linear_arithmetic.
+      remember (n - k).
+      rewrite N.div_div.
+      rewrite N.div_mul_cancel_r.
+      rewrite Heqn1.
+      replace (n0! * k! * (k + 1)) with (n0! * ((k + 1) * k!)).
+      equality.
+      linear_arithmetic.
+      rewrite Heqn1.
+      apply mul_nonzero. split.
+      apply mul_nonzero. split.
+      apply fact_nonzero. apply fact_nonzero.
+      linear_arithmetic.
+      linear_arithmetic.
+      rewrite Heqn1.
+      apply mul_nonzero. split.
+      apply mul_nonzero. split.
+      apply fact_nonzero. apply fact_nonzero.
+      linear_arithmetic.
+      linear_arithmetic.
+      eapply N.div_div.
+      rewrite Heqn1.
+      apply mul_nonzero. split.
+      apply mul_nonzero. split.
+      apply fact_nonzero. apply fact_nonzero.
+      linear_arithmetic.
+      linear_arithmetic.
+      remember (n0! * k!).
+      rewrite N.div_div.
+      replace (n! / n2 * n0) with (n! * n0 / n2).
+      rewrite N.div_div.
+      equality.
+      rewrite Heqn2.
+      apply mul_nonzero. split.
+      apply fact_nonzero.
+      apply fact_nonzero.
+      linear_arithmetic.
+      replace (n! * n0) with (n0 * n!).
+      replace (n! / n2 * n0) with (n0 * n! / n2).
+      equality.
+      rewrite N.divide_div_mul_exact.
+      remember (n! / n2).
+      linear_arithmetic.
+      rewrite Heqn2.
+      apply mul_nonzero. split.
+      apply fact_nonzero. apply fact_nonzero.
+      rewrite Heqn2.
+      rewrite Heqn0.
+      eapply C_is_integer.
+      equality.
+      linear_arithmetic.
+      rewrite Heqn2.
+      apply mul_nonzero. split.
+      apply fact_nonzero.
+      apply fact_nonzero.
+      linear_arithmetic.
+  Qed.
 
   (* All binomial coefficients for a given n *)
   (* *************************************** *)
@@ -671,7 +775,7 @@ Module Impl.
     simplify.
     replace (len (all_coeffs_fast n)) with (n + 1).
     replace (len (seq (fun k : N => ith (k - 1)
-                  (all_coeffs_fast n) + ith k (all_coeffs_fast n))
+                                        (all_coeffs_fast n) + ith k (all_coeffs_fast n))
                       (n + 1) 1)) with (n + 1).
     linear_arithmetic.
     Search (len).
