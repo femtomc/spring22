@@ -375,12 +375,24 @@ Module Impl.
   Theorem lookup_insert {A} (k : list bool) (v : option A) (t : bitwise_trie A) :
     lookup k (insert k v t) = v.
   Proof.
-    induct t.
-    cases k.
+    induct k.
+    cases t.
+    simplify.
     equality.
-    replace (insert (b :: k) v Leaf) with (build_singleton (b :: k) v) by equality.
+    simplify.
+    equality.
+    cases a.
+    cases t.
+    simplify.
     apply lookup_build_singleton.
-  Admitted.
+    simplify.
+    apply IHk.
+    cases t.
+    simplify.
+    apply lookup_build_singleton.
+    simplify.
+    apply IHk.
+  Qed.
 
   (* Define an operation to "merge" that takes two bitwise tries and merges
    * them together. The [merge] definition should combine two bitwise tries, 
@@ -429,7 +441,46 @@ Module Impl.
       lookup k (merge t1 t2) = Some v.
   Proof.
     intros.
-  Admitted.
+    induct t1.
+    simplify.
+    cases t2.
+    simplify.
+    equality.
+    cases k.
+    simplify.
+    equality.
+    cases b.
+    simplify.
+    equality.
+    simplify.
+    equality.
+    cases t2.
+    cases k.
+    simplify.
+    equality.
+    cases b.
+    simplify.
+    equality.
+    simplify.
+    equality.
+    cases d.
+    simplify.
+    cases k.
+    equality.
+    cases b.
+    eapply IHt1_1.
+    assumption.
+    eapply IHt1_2.
+    assumption.
+    simplify.
+    cases k.
+    equality.
+    cases b.
+    apply IHt1_1.
+    equality.
+    eapply IHt1_2.
+    equality.
+  Qed.
 
   Theorem lookup_merge_None {A} : forall (t1 t2 : bitwise_trie A) k,
       lookup k (merge t1 t2) = None ->
@@ -437,7 +488,76 @@ Module Impl.
   Proof.
     intros.
     split.
-  Admitted.
+    induct t1.
+    equality.
+    cases k.
+    cases t2.
+    replace (merge (Node t1_1 d t1_2) Leaf) with (Node t1_1 d t1_2) in H.
+    equality.
+    equality.
+    simplify.
+    cases d.
+    equality.
+    equality.
+    cases b.
+    cases t2.
+    equality.
+    simplify.
+    cases d.
+    replace (lookup (true :: k) (Node (merge t1_1 t2_1) (Some a) (merge t1_2 t2_2))) with (lookup k (merge t1_1 t2_1)) in H.
+    apply IHt1_1 in H.
+    assumption.
+    equality.
+    replace (lookup (true :: k) (Node (merge t1_1 t2_1) d0 (merge t1_2 t2_2))) with (lookup k (merge t1_1 t2_1)) in H.
+    apply IHt1_1 in H.
+    assumption.
+    equality.
+    cases t2.
+    equality.
+    simplify.
+    cases d.
+    replace (lookup (false :: k) (Node (merge t1_1 t2_1) (Some a) (merge t1_2 t2_2))) with (lookup k (merge t1_2 t2_2)) in H.
+    apply IHt1_2 in H.
+    assumption.
+    equality.
+    replace (lookup (false :: k) (Node (merge t1_1 t2_1) d0 (merge t1_2 t2_2))) with (lookup k (merge t1_2 t2_2)) in H.
+    apply IHt1_2 in H.
+    assumption.
+    equality.
+    induct t1.
+    cases t2.
+    equality.
+    equality.
+    cases k.
+    cases t2.
+    equality.
+    cases d.
+    replace (lookup [] (merge (Node t1_1 (Some a) t1_2) (Node t2_1 d0 t2_2))) with (Some a) in H by equality.
+    equality.
+    replace (lookup [] (merge (Node t1_1 None t1_2) (Node t2_1 d0 t2_2))) with d0 in H by equality.
+    equality.
+    cases b.
+    cases t2.
+    equality.
+    replace (lookup (true :: k) (Node t2_1 d0 t2_2)) with (lookup k t2_1) by equality.
+    eapply IHt1_1.
+    simplify.
+    cases d.
+    simplify.
+    assumption.
+    assumption.
+    cases t2.
+    equality.
+    replace (lookup (false :: k) (Node t2_1 d0 t2_2)) with (lookup k t2_2) by equality.
+    simplify.
+    cases d.
+    simplify.
+    eapply IHt1_2.
+    equality.
+    simplify.
+    eapply IHt1_2.
+    equality.
+  Qed.
   
   (* HINT 5 (see Pset3Sig.v) *)
   Lemma merge_id {A} : forall (t1 : bitwise_trie A),
@@ -459,11 +579,37 @@ Lemma merge_idempotent {A} : forall (t1 t2 : bitwise_trie A),
     merge t1 (merge t1 t2) = merge t1 t2.
   Proof.
     intros.
-    induct t2.
-    replace (merge t1 Leaf) with t1.
+    induct t1.
+    cases t2.
+    equality.
+    equality.
+    cases t2.
+    simplify.
+    cases d.
+    replace (merge t1_1 t1_1) with (t1_1).
+    replace (merge t1_2 t1_2) with (t1_2).
+    equality.
+    symmetry.
     apply merge_id.
-    admit.
-  Admitted.
+    symmetry.
+    apply merge_id.
+    replace (merge t1_1 t1_1) with (t1_1).
+    replace (merge t1_2 t1_2) with (t1_2).
+    equality.
+    symmetry.
+    apply merge_id.
+    symmetry.
+    apply merge_id.
+    cases d.
+    simplify.
+    rewrite IHt1_1.
+    rewrite IHt1_2.
+    equality.
+    simplify.
+    rewrite IHt1_1.
+    rewrite IHt1_2.
+    equality.
+  Qed.
 
   Theorem merge_selfCompose {A} : forall n (t1 t2 : bitwise_trie A),
       0 < n ->
@@ -530,16 +676,14 @@ Lemma merge_idempotent {A} : forall (t1 t2 : bitwise_trie A),
     intros.
     induct t.
     equality.
-    replace (mirror (Node t1 d t2)) with (Node (mirror t2) d (mirror t1)) by equality.
-    replace (flatten (Node (mirror t2) d (mirror t1))) with (flatten (mirror t2) ++ d :: flatten (mirror t1)) by equality.
+    simplify.
     rewrite IHt1.
     rewrite IHt2.
-    replace (flatten (Node t1 d t2)) with (flatten t1 ++ d :: flatten t2) by equality.
-    replace (rev (flatten t1 ++ d :: flatten t2)) with ( (rev (flatten t2)) ++ d :: (rev (flatten t1)) ).
+    rewrite rev_app_distr.
+    simplify.
+    rewrite <- app_assoc.
     equality.
-    remember (flatten t2).
-    remember (flatten t1).
-  Admitted.
+  Qed.
 
   (** ** HOFs on lists and trees **)
   
