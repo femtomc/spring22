@@ -31,7 +31,7 @@ Module Impl.
   Inductive tree :=
   | Leaf (* an empty tree *)
   | Node (d : t) (l r : tree).
-  *)
+   *)
   (* Then a singleton is just a node without subtrees. *)
   Definition Singleton (v: t) := Node v Leaf Leaf.
 
@@ -45,9 +45,9 @@ Module Impl.
     match tr with
     | Leaf => forall x, not (s x) (* s is empty set *)
     | Node d l r =>
-        s d /\
-        bst l (fun x => s x /\ x < d) /\
-        bst r (fun x => s x /\ d < x)
+      s d /\
+      bst l (fun x => s x /\ x < d) /\
+      bst r (fun x => s x /\ d < x)
     end.
 
   (* [member] computes whether [a] is in [tr], but to do so it *relies* on the
@@ -89,8 +89,10 @@ Module Impl.
       | r => r
       end
     end.
+
   Definition is_leaf (tr : tree) : bool :=
     match tr with Leaf => true | _ => false end.
+
   Fixpoint delete_rightmost (tr: tree) : tree :=
     match tr with
     | Leaf => Leaf
@@ -99,6 +101,7 @@ Module Impl.
       then lt
       else Node v lt (delete_rightmost rt)
     end.
+
   Definition merge_ordered lt rt :=
     match rightmost lt with
     | Some rv => Node rv (delete_rightmost lt) rt
@@ -148,14 +151,14 @@ Module Impl.
   Ltac use_bst_iff known_bst :=
     lazymatch type of known_bst with
     | bst ?tree2 ?set2 =>
+      lazymatch goal with
+      | |- bst ?tree1 ?set1 =>
+        apply bst_iff with (P:=set2) (Q := set1);
         lazymatch goal with
-        | |- bst ?tree1 ?set1 =>
-            apply bst_iff with (P:=set2) (Q := set1);
-            lazymatch goal with
-            |- bst tree2 set2 => apply known_bst
-            | _ => idtac
-            end
+        |- bst tree2 set2 => apply known_bst
+        | _ => idtac
         end
+      end
     end.
 
   Ltac use_bst_iff_assumption :=
@@ -185,24 +188,170 @@ Module Impl.
      subtrees are in violation of a performance-critical invariant, but the rotations
      themselves are correct regardless. (These are straight from
      https://en.wikipedia.org/wiki/AA_tree#Balancing_rotations.) *)
+
   (* Each one can be written as a simple non-recursive definition
      containing two "match" expressions that returns the original
      tree in cases where the expected structure is not present. *)
-  
+
   (* HINT 1 (see Pset4Sig.v) *)
-  Definition rotate (T : tree) : tree.
-  Admitted.
+  Definition rotate (T : tree) : tree :=
+    match T with
+    | Node t L R =>
+      match L with
+      | Node l A B => Node l A (Node t B R)
+      | _ => T
+      end
+    | _ => T
+    end.
 
   Lemma bst_rotate T s (H : bst T s) : bst (rotate T) s.
-  Admitted.
+    cases T; propositional.
+    cases T1; propositional.
+    simplify; propositional;
+      use_bst_iff_assumption; propositional; linear_arithmetic.
+  Qed.
 
   (* There is a hint in the signature file that completely gives away the proofs
    * of these rotations. We recommend you study that code after completing this
    * exercise to see how we did it, maybe picking up a trick or two to use below. *)
 
   Lemma bst_insert : forall tr s a, bst tr s ->
-    bst (insert a tr) (fun x => s x \/ x = a).
+bst (insert a tr) (fun x => s x \/ x = a).
   Proof.
+    intros.
+    induct tr.
+    simplify.
+    split.
+    equality.
+    split.
+    intros.
+    unfold not.
+    intros.
+    destruct H0.
+    destruct H0.
+    unfold not in H.
+    eapply H in H0.
+    assumption.
+    linear_arithmetic.
+    intros.
+    unfold not.
+    intros.
+    destruct H0.
+    destruct H0.
+    eapply H in H0.
+    assumption.
+    linear_arithmetic.
+    cases tr1.
+    simplify.
+    cases (compare a d); simplify.
+    split.
+    equality.
+    split.
+    split.
+    equality.
+    split.
+    intros.
+    unfold not.
+    intros.
+    destruct H0.
+    destruct H0.
+    destruct H.
+    destruct H3.
+    destruct H0.
+    eapply H3.
+    split.
+    eapply H0.
+    eapply H2.
+    linear_arithmetic.
+    intros.
+    unfold not.
+    intros.
+    destruct H0.
+    destruct H.
+    destruct H2.
+    destruct H0.
+    destruct H0.
+    eapply H2.
+    split.
+    apply H0.
+    assumption.
+    linear_arithmetic.
+    destruct H.
+    destruct H0.
+    eapply bst_iff.
+    apply H1.
+    intros.
+    split.
+    equality.
+    intros.
+    destruct H2.
+    split.
+    destruct H2.
+    assumption.
+    linear_arithmetic.
+    assumption.
+    split.
+    linear_arithmetic.
+    split.
+    intros.
+    destruct H.
+    destruct H0.
+    unfold not.
+    intros.
+    destruct H2.
+    destruct H2.
+    eapply H0.
+    split.
+    apply H2.
+    apply H3.
+    linear_arithmetic.
+    destruct H.
+    destruct H0.
+    eapply bst_iff.
+    apply H1.
+    intros.
+    split.
+    equality.
+    equality.
+    split.
+    equality.
+    split.
+    intros.
+    destruct H.
+    destruct H0.
+    unfold not.
+    intros.
+    destruct  H2.
+    destruct H2.
+    eapply H0.
+    split.
+    apply H2.
+    apply H3.
+    linear_arithmetic.
+    destruct H.
+    destruct H0.
+    eapply IHtr2 in H1.
+    eapply bst_iff.
+    apply H1.
+    intros.
+    split.
+    equality.
+    intros.
+    destruct H2.
+    equality.
+    cases tr2.
+    simplify.
+    cases (compare a d); simplify.
+    split.
+    equality.
+    split.
+    equality.
+    split.
+    destruct H.
+    destruct H0.
+    destruct H0.
+    destruct H2.
+    destruct H0.
   Admitted.
 
   (* To prove [bst_delete], you will need to write specifications for its helper
@@ -219,11 +368,47 @@ Module Impl.
 
   (* HINT 2-5 (see Pset4Sig.v) *)
   Lemma bst_delete : forall tr s a, bst tr s ->
-    bst (delete a tr) (fun x => s x /\ x <> a).
+bst (delete a tr) (fun x => s x /\ x <> a).
   Proof.
+    intros.
+    induct tr.
+    simplify.
+    unfold not.
+    intros.
+    destruct H0.
+    unfold not in H.
+    apply H in H0.
+    assumption.
+    simplify.
+    cases (compare a d); simplify.
+    split.
+    split.
+    equality.
+    linear_arithmetic.
+    split.
+    destruct H.
+    destruct H0.
+    eapply bst_iff.
+    apply IHtr1.
+    apply H0.
+    split.
+    equality.
+    equality.
+    destruct H.
+    destruct H0.
+    eapply bst_iff.
+    apply H1.
+    split.
+    intros.
+    split.
+    split.
+    equality.
+    linear_arithmetic.
+    equality.
+    equality.
   Admitted.
 
-  (* Great job! Now you have proven all tree-structure-manipulating operations
+(* Great job! Now you have proven all tree-structure-manipulating operations
      necessary to implement a balanced binary search tree. Rebalancing heuristics
      that achieve worst-case-logarithmic running time maintain annotations on
      nodes of the tree (and decide to rebalance based on these). The implementation
