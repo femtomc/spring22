@@ -219,140 +219,33 @@ Module Impl.
 bst (insert a tr) (fun x => s x \/ x = a).
   Proof.
     intros.
-    induct tr.
-    simplify.
-    split.
-    equality.
-    split.
-    intros.
-    unfold not.
-    intros.
-    destruct H0.
-    destruct H0.
-    unfold not in H.
-    eapply H in H0.
-    assumption.
-    linear_arithmetic.
-    intros.
-    unfold not.
-    intros.
-    destruct H0.
-    destruct H0.
-    eapply H in H0.
-    assumption.
-    linear_arithmetic.
-    cases tr1.
-    simplify.
-    cases (compare a d); simplify.
-    split.
-    equality.
-    split.
-    split.
-    equality.
-    split.
-    intros.
-    unfold not.
-    intros.
-    destruct H0.
-    destruct H0.
-    destruct H.
-    destruct H3.
-    destruct H0.
-    eapply H3.
-    split.
-    eapply H0.
-    eapply H2.
-    linear_arithmetic.
-    intros.
-    unfold not.
-    intros.
-    destruct H0.
-    destruct H.
-    destruct H2.
-    destruct H0.
-    destruct H0.
-    eapply H2.
-    split.
-    apply H0.
-    assumption.
-    linear_arithmetic.
-    destruct H.
-    destruct H0.
+    induct tr; propositional; simplify; propositional.
+    apply H in H0. assumption. linear_arithmetic.
+    apply H in H0. assumption. linear_arithmetic.
+    cases (compare a d); simplify; propositional.
+    eapply bst_iff. apply IHtr1. apply H.
+    propositional; linear_arithmetic.
     eapply bst_iff.
-    apply H1.
-    intros.
-    split.
-    equality.
-    intros.
-    destruct H2.
-    split.
-    destruct H2.
-    assumption.
+    apply H2. propositional.
     linear_arithmetic.
-    assumption.
-    split.
+    eapply bst_iff.
+    apply H.
+    propositional.
     linear_arithmetic.
-    split.
-    intros.
-    destruct H.
-    destruct H0.
-    unfold not.
-    intros.
-    destruct H2.
-    destruct H2.
-    eapply H0.
-    split.
+    eapply bst_iff.
     apply H2.
-    apply H3.
+    propositional.
     linear_arithmetic.
-    destruct H.
-    destruct H0.
     eapply bst_iff.
-    apply H1.
-    intros.
-    split.
-    equality.
-    equality.
-    split.
-    equality.
-    split.
-    intros.
-    destruct H.
-    destruct H0.
-    unfold not.
-    intros.
-    destruct  H2.
-    destruct H2.
-    eapply H0.
-    split.
+    apply H.
+    propositional.
+    linear_arithmetic.
+    eapply bst_iff.
+    apply IHtr2.
     apply H2.
-    apply H3.
+    propositional.
     linear_arithmetic.
-    destruct H.
-    destruct H0.
-    eapply IHtr2 in H1.
-    eapply bst_iff.
-    apply H1.
-    intros.
-    split.
-    equality.
-    intros.
-    destruct H2.
-    equality.
-    cases tr2.
-    simplify.
-    cases (compare a d); simplify.
-    split.
-    equality.
-    split.
-    equality.
-    split.
-    destruct H.
-    destruct H0.
-    destruct H0.
-    destruct H2.
-    destruct H0.
-  Admitted.
+  Qed.
 
   (* To prove [bst_delete], you will need to write specifications for its helper
      functions, find suitable statements for proving correctness by induction, and use
@@ -366,47 +259,372 @@ bst (insert a tr) (fun x => s x \/ x = a).
      the lemmas you prove about one function need to specify everything a caller
      would need to know about this function. *)
 
+  (* This is cheeky, but helpful *)
+  Lemma rightmost_none_implies_leaf :
+    forall tr, rightmost tr = None -> tr = Leaf.
+  Proof.
+    induct tr; propositional; simplify.
+    cases (rightmost tr2); simplify.
+    equality.
+    equality.
+  Qed.
+
+  Lemma rightmost_prop :
+    forall tr P n, bst tr P
+              -> (rightmost tr = Some n)
+              -> P n.
+  Proof.
+    intros.
+    induct tr.
+    simplify.
+    equality.
+    simplify.
+    cases (rightmost tr2).
+    destruct H.
+    destruct H1.
+    eapply IHtr2 in H2.
+    apply H2.
+    assumption.
+    destruct H.
+    destruct H1.
+    equality.
+  Qed.
+
+  Lemma rightmost_max :
+    forall tr P n, bst tr P
+              -> (rightmost tr = Some n)
+              -> bst tr (fun x : t => P x /\ x <= n).
+  Proof.
+    intros.
+    induct tr; propositional; simplify.
+    equality. propositional.
+    cases (rightmost tr2); simplify.
+    apply IHtr2 with (n := n) in H3.
+    eapply rightmost_prop with (n := n0) in H3.
+    destruct H3.
+    destruct H2.
+    linear_arithmetic.
+    assumption.
+    assumption.
+    assert (d = n).
+    equality.
+    linear_arithmetic.
+    cases (rightmost tr2); simplify.
+    eapply IHtr2 with (n := n) in H3.
+    apply rightmost_prop with (n := n0) in H3.
+    eapply bst_iff.
+    apply H.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+    eapply bst_iff.
+    apply H.
+    propositional.
+    assert (x < n).
+    equality.
+    linear_arithmetic.
+    cases (rightmost tr2); simplify.
+    eapply IHtr2 in H3.
+    eapply bst_iff.
+    apply H3.
+    propositional.
+    apply H5.
+    assumption.
+    assumption.
+    apply rightmost_none_implies_leaf in Heq; simplify.
+    rewrite Heq.
+    simplify.
+    propositional.
+    assert (d = n) by equality.
+    linear_arithmetic.
+  Qed.
+
+  Lemma delete_rightmost_prop :
+    forall tr P n , bst tr P
+               -> (rightmost tr = Some n)
+               -> bst (delete_rightmost tr) (fun x : t => P x /\ x < n).
+  Proof.
+    intros.
+    induct tr; simplify; propositional.
+    equality.
+    cases (is_leaf tr2); simplify.
+    cases (rightmost tr2); simplify.
+    cases tr2; simplify.
+    equality.
+    equality.
+    eapply bst_iff.
+    apply H.
+    propositional.
+    assert ( d = n ) by equality.
+    linear_arithmetic.
+    assert ( d = n ) by equality.
+    linear_arithmetic.
+    propositional.
+    cases (rightmost tr2); simplify.
+    eapply rightmost_prop in H3.
+    apply H3.
+    equality.
+    apply rightmost_none_implies_leaf in Heq0.
+    rewrite Heq0 in Heq; simplify.
+    equality.
+    cases (rightmost tr2); simplify.
+    eapply bst_iff.
+    apply H.
+    propositional.
+    eapply rightmost_prop with (n := n0) in H3.
+    destruct H3.
+    assert (n0 = n) by equality.
+    rewrite H6 in H3.
+    linear_arithmetic.
+    assumption.
+    apply rightmost_none_implies_leaf in Heq0.
+    rewrite Heq0 in Heq.
+    simplify.
+    equality.
+    cases (rightmost tr2); simplify.
+    eapply IHtr2 in H3.
+    eapply bst_iff.
+    apply H3.
+    propositional.
+    apply H5.
+    assumption.
+    assumption.
+    apply rightmost_none_implies_leaf in Heq0.
+    rewrite Heq0 in Heq.
+    simplify.
+    equality.
+  Qed.
+
+  Lemma rightmost_merge_ordered :
+    forall tr2 tr1 n , rightmost tr2 = Some n
+               -> rightmost (merge_ordered tr1 tr2) = Some n.
+  Proof.
+    induct tr2; simplify; try equality; propositional.
+    cases tr1; simplify.
+    cases (rightmost tr2_2); simplify; try equality.
+    unfold merge_ordered.
+    cases (rightmost (Node d0 tr1_1 tr1_2)); simplify.
+    cases (rightmost tr2_2); simplify; try equality.
+    cases (rightmost tr2_2); simplify; try equality.
+  Qed.
+
+  Lemma merge_ordered_prop :
+    forall tr1 tr2 P n, bst (merge_ordered tr1 tr2) P
+                 -> (rightmost tr2 = Some n)
+                 -> bst (merge_ordered tr1 tr2) (fun x : t => P x /\ x <= n).
+  Proof.
+    intros.
+    induct tr2; simplify; try equality; propositional.
+    cases (rightmost tr2_2); simplify.
+    eapply rightmost_max in H.
+    apply H.
+    apply rightmost_merge_ordered; simplify.
+    rewrite Heq.
+    assumption.
+    eapply rightmost_max.
+    assumption.
+    eapply rightmost_merge_ordered.
+    apply rightmost_none_implies_leaf in Heq.
+    rewrite Heq.
+    cases tr2_1; simplify.
+    equality.
+    equality.
+  Qed.
+
+  Lemma partial_bst_iff :
+    forall tr P n, bst tr (fun x : t => P x /\ x < n)
+              -> (forall x, P x /\ n < x -> False)
+              -> bst tr (fun x : t => P x /\ x <> n).
+  Proof.
+    intros.
+    eapply bst_iff.
+    apply H.
+    propositional.
+    linear_arithmetic.
+    cases (compare x n).
+    assumption.
+    apply H3 in e.
+    equality.
+    assert (P x /\ n < x).
+    equality.
+    apply H0 in H1.
+    equality.
+  Qed.
+
+  Lemma member_has_prop :
+    forall tr P x, bst tr P -> member x tr = true -> P x.
+  Proof.
+    intros.
+    induct tr; simplify; propositional; try equality.
+    cases (compare x d); simplify; propositional.
+    eapply IHtr1 in H.
+    apply H.
+    assumption.
+    equality.
+    eapply IHtr2 in H3.
+    apply H3.
+    equality.
+  Qed.
+
+  (* I believe this is the correct lemma, but I was unable to prove this completely. *)
+  Lemma merge_ordered_less_than :
+    forall tr1 tr2 P a, bst tr1 (fun x : t => P x /\ x < a)
+                      -> bst tr2 (fun x : t => P x /\ a < x)
+                      -> bst (merge_ordered tr1 tr2) (fun x : t => P x /\ x <> a).
+  Proof.
+    intros.
+    induct tr2; unfold merge_ordered; cases (rightmost tr1); simplify; propositional; try equality.
+    apply rightmost_prop with (n := n) in H.
+    equality.
+    equality.
+    apply rightmost_prop with (n := n) in H.
+    linear_arithmetic.
+    equality.
+    apply rightmost_max with (n := n) in H as Hn0.
+    apply delete_rightmost_prop with (n := n) in H as Hn1.
+    eapply partial_bst_iff in H as Hn.
+    eapply delete_rightmost_prop with (n := n) in Hn.
+    assumption.
+    assumption.
+    assumption.
+    assumption.
+    assumption.
+    propositional.
+    apply rightmost_prop with (n := n) in H as Hn.
+    destruct Hn.
+    admit.
+
+    equality.
+    eapply rightmost_none_implies_leaf in Heq.
+    rewrite Heq in H.
+    simplify.
+    unfold not in H.
+    cases (compare x a); simplify.
+    eapply H.
+    split.
+    apply H2.
+    apply l.
+    eapply H3.
+    assumption.
+    eapply H0.
+    split.
+    apply H2.
+    linear_arithmetic.
+    apply rightmost_prop with (n := n) in H as Hn.
+    equality.
+    equality.
+    apply rightmost_prop with (n := n) in H as Hn.
+    linear_arithmetic.
+    equality.
+    apply rightmost_max with (n := n) in H.
+    apply delete_rightmost_prop with (n := n) in H as Hn.
+    eapply bst_iff.
+    apply Hn.
+    propositional.
+    linear_arithmetic.
+    cases (compare x a); simplify.
+    linear_arithmetic.
+    linear_arithmetic.
+    apply rightmost_prop with (n := n) in H.
+    linear_arithmetic.
+    equality.
+    linear_arithmetic.
+    equality.
+    equality.
+    linear_arithmetic.
+    apply rightmost_prop with (n := n) in H.
+    linear_arithmetic.
+    equality.
+
+    apply rightmost_max with (n := n) in H.
+    eapply bst_iff.
+    apply H1.
+    propositional.
+    linear_arithmetic.
+    apply rightmost_prop with (n := n) in H.
+    linear_arithmetic.
+    equality.
+    cases (compare a n); simplify.
+    apply rightmost_prop with (n := n) in H.
+    linear_arithmetic.
+    equality.
+    linear_arithmetic.
+    cases (compare a x); simplify.
+    linear_arithmetic.
+    linear_arithmetic.
+    admit.
+    equality.
+
+    admit.
+    linear_arithmetic.
+    eapply rightmost_none_implies_leaf in Heq.
+    rewrite Heq in H.
+    simplify.
+    unfold not in H.
+    eapply bst_iff.
+    apply H1.
+    propositional.
+    linear_arithmetic.
+    cases (compare x a); simplify.
+    assert (P x /\ x < a).
+    equality.
+    apply H in H5.
+    equality.
+    apply H7 in e.
+    equality.
+    linear_arithmetic.
+    eapply bst_iff.
+    apply H4.
+    propositional.
+    linear_arithmetic.
+    eapply rightmost_none_implies_leaf in Heq.
+    rewrite Heq in H.
+    simplify.
+    unfold not in H.
+    cases (compare x a); simplify.
+    assert (P x /\ x < a).
+    equality.
+    apply H in H5.
+    equality.
+    apply H7 in e.
+    equality.
+    linear_arithmetic.
+  Admitted.
+
+
   (* HINT 2-5 (see Pset4Sig.v) *)
   Lemma bst_delete : forall tr s a, bst tr s ->
 bst (delete a tr) (fun x => s x /\ x <> a).
   Proof.
     intros.
-    induct tr.
-    simplify.
-    unfold not.
-    intros.
-    destruct H0.
-    unfold not in H.
-    apply H in H0.
-    assumption.
-    simplify.
-    cases (compare a d); simplify.
-    split.
-    split.
-    equality.
+    induct tr; propositional; simplify; propositional.
+    apply H in H1. assumption.
+    cases (compare a d); propositional; simplify; propositional.
     linear_arithmetic.
-    split.
-    destruct H.
-    destruct H0.
+    eapply IHtr1 in H.
     eapply bst_iff.
-    apply IHtr1.
-    apply H0.
-    split.
-    equality.
-    equality.
-    destruct H.
-    destruct H0.
+    apply H.
+    propositional.
     eapply bst_iff.
-    apply H1.
-    split.
-    intros.
-    split.
-    split.
-    equality.
+    apply H2.
+    propositional.
     linear_arithmetic.
-    equality.
-    equality.
-  Admitted.
+    eapply merge_ordered_less_than.
+    rewrite <- e in H.
+    apply H.
+    rewrite <- e in H2.
+    apply H2.
+    linear_arithmetic.
+    eapply bst_iff.
+    apply H.
+    propositional.
+    linear_arithmetic.
+    eapply IHtr2 in H2.
+    eapply bst_iff.
+    apply H2.
+    propositional.
+  Qed.
 
 (* Great job! Now you have proven all tree-structure-manipulating operations
      necessary to implement a balanced binary search tree. Rebalancing heuristics
