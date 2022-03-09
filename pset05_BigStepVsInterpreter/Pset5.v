@@ -385,10 +385,31 @@ Module Impl.
   Proof.
     unfold loop_of_unknown_length.
     induct n; simplify.
-    eapply EvalWhileTrue.
+    assert (initialCounter + 0 = initialCounter) by linear_arithmetic.
+    rewrite H.
+    eapply EvalWhileFalse.
     eapply ValuesVarUndefined; simplify.
     equality.
-  Admitted.
+    eapply EvalWhileTrue with (v' := $0 $+ ("counter", initialCounter + 1)).
+    eapply ValuesVarUndefined; simplify.
+    equality.
+    eapply EvalAssign.
+    eapply ValuesPlus.
+    eapply ValuesVarDefined.
+    simplify.
+    equality.
+    eapply ValuesConst.
+    equality.
+    equality.
+    maps_equal.
+    assert ($0 $+ ("counter", initialCounter + 1) = $0 $+ ("counter", initialCounter) $+ ("counter", initialCounter + 1)).
+    maps_equal.
+    assert (initialCounter + S n = initialCounter + 1 + n) by linear_arithmetic.
+    rewrite H0.
+    eapply IHn.
+    Unshelve.
+    equality.
+  Qed.
 
   (* Wherever this TODO_FILL_IN is used, you should replace it with your own code *)
   Axiom TODO_FILL_IN: Prop.
