@@ -160,7 +160,17 @@ Module Impl.
   | ValuesConst: forall v n1 n2,
       n1 = n2 ->
       values (Const n1) v n2
-  .
+  | ValuesVarDefined: forall (v: valuation) x a,
+      lookup v x = Some a ->
+      values (Var x) v a
+  | ValuesVarUndefined: forall (v: valuation) x a,
+      lookup v x = None ->
+      values (Var x) v a
+  | ValuesPlus: forall a1 e1 a2 e2 v a,
+      values e1 v a1 ->
+      values e2 v a2 ->
+      a = a1 + a2 ->
+      values (Plus e1 e2) v a.
 
   (* Note that the following alternative would also work for ValuesConst and
      ValuesPlus:
@@ -202,20 +212,30 @@ Module Impl.
     (* Once you define the four constructors for "values", you can uncomment
        the script below. Make sure you understand how it relates to the proof
        tree above! *)
-    (*
     eapply ValuesPlus with (a1 := 2) (a2 := a - 2).
     - eapply ValuesVarDefined. simplify. equality.
     - eapply ValuesVarUndefined. simplify. equality.
     - linear_arithmetic.
-      *)
-  Admitted.
+  Qed.
 
   (* Now, let's prove that "interp" and "values" are equivalent.
      First, [interp -> values]: *)
   Theorem interp_to_values: forall e v a,
       interp e v a -> values e v a.
   Proof.
-  Admitted.
+    simplify.
+    induct e; simplify; first_order.
+    rewrite H. eapply ValuesConst. equality.
+    cases (v $? x); simplify.
+    eapply ValuesVarDefined; simplify. equality.
+    eapply ValuesVarUndefined; simplify. equality.
+    eapply ValuesPlus; simplify.
+    apply IHe1 in H.
+    apply H.
+    apply IHe2 in H0.
+    apply H0.
+    equality.
+  Qed.
 
   (* To prove the other direction, we have a choice: we can either induct on
      [e] or directly on the proof of [values e v a], because [values] is an
@@ -228,7 +248,15 @@ Module Impl.
   Proof.
     induct 1; (* ← do not change this line *)
       simplify.
-  Admitted.
+    equality.
+    rewrite H.
+    equality.
+    rewrite H.
+    equality.
+    assert (interp e1 v a1 /\ interp e2 v a2 /\ a = a1 + a2).
+    first_order.
+    first_order.
+  Qed.
 
   (* Now let's see how things look with an induction on e.  In this simple case,
      it's very similar: *)
@@ -237,7 +265,18 @@ Module Impl.
   Proof.
     induct e; (* ← not the best, but for the sake of the exercise do not change this line *)
       simplify.
-  Admitted.
+    invert H.
+    equality.
+    cases (v $? x); simplify.
+    invert H.
+    equality.
+    equality.
+    equality.
+    invert H.
+    apply IHe1 in H2.
+    apply IHe2 in H3.
+    first_order.
+  Qed.
 
   (* Let's define nondeterministic big-step semantics for evaluating a command.
      Define [eval] as an Inductive Prop such that [eval v1 c v2] means
@@ -245,10 +284,34 @@ Module Impl.
      Whenever you encounter an arithmetic expression, use [values] to obtain a
      value it can step to.
      Hint: This will be quite similar to [eval] in OperationalSemantics.v! *)
-  Inductive eval: valuation -> cmd -> valuation -> Prop :=
-  | EvalSkip: forall v,
+  Inductive eval : valuation -> cmd -> valuation -> Prop :=
+  | EvalSkip : forall v,
       eval v Skip v
-  .
+  | EvalAssign : forall (v v': valuation) x e a,
+      values e v a
+      -> v' = v $+ (x, a)
+      -> eval v (Assign x e) v'
+  | EvalSeq : forall v c1 v1 c2 v2,
+      eval v c1 v1
+      -> eval v1 c2 v2
+      -> eval v (Sequence c1 c2) v2
+  | EvalIfTrue : forall v e a then_ else_ v',
+      values e v a
+      -> a <> 0
+      -> eval v then_ v'
+      -> eval v (If e then_ else_) v'
+  | EvalIfFalse : forall v e then_ else_ v',
+      values e v 0
+      -> eval v else_ v'
+      -> eval v (If e then_ else_) v'
+  | EvalWhileTrue : forall v e a body v' v'',
+      values e v a
+      -> eval v body v'
+      -> eval v' (While e body) v''
+      -> eval v (While e body) v''
+  | EvalWhileFalse : forall v e body,
+      values e v 0
+      -> eval v (While e body) v.
 
   (* Hint: Many of the proofs below will depend on definitions we ask you to
      find yourself, and if you get these definitions wrong, the proofs will
@@ -275,7 +338,11 @@ Module Impl.
   Lemma read_last_value: forall x v c n,
       values (Var x) (v $+ (x, c)) n -> n = c.
   Proof.
-  Admitted.
+    simplify.
+    invert H; simplify.
+    equality.
+    equality.
+  Qed.
 
   (* Hint: This next theorem is a bit boring -- it's about 30 lines of "invert",
      "simplify", "discriminate", "equality", "linear_arithmetic" and
@@ -290,7 +357,19 @@ Module Impl.
   Theorem the_answer_is_indeed_42:
     forall v, eval $0 the_answer_is_42 v -> v $? "answer" = Some 42.
   Proof.
-  Admitted.
+    simplify.
+    invert H.
+    repeat match goal with
+    | [ H : eval _ _ _ |- _ ] => invert H; simplify
+    | [ H : values (Var ?x) (?v $+ (?x, ?a)) ?b |- _] => apply read_last_value in H
+           end.
+    eapply values_to_interp in H4; simplify; try equality.
+    eapply values_to_interp in H4; simplify; try equality.
+    eapply values_to_interp in H2.
+    simplify. first_order. linear_arithmetic.
+    eapply values_to_interp in H4; simplify; try equality.
+    eapply values_to_interp in H2; simplify. linear_arithmetic.
+  Qed.
 
   (* Here's another example program. If we run it on a valuation that is
      undefined for "x", it will read the undefined variable "x" to decide
@@ -306,6 +385,9 @@ Module Impl.
   Proof.
     unfold loop_of_unknown_length.
     induct n; simplify.
+    eapply EvalWhileTrue.
+    eapply ValuesVarUndefined; simplify.
+    equality.
   Admitted.
 
   (* Wherever this TODO_FILL_IN is used, you should replace it with your own code *)
@@ -341,7 +423,8 @@ Module Impl.
         (exists r, interp e v1 r /\ r <> 0 /\ run fuel' v1 c1 v2) \/
         (interp e v1 0 /\ run fuel' v1 c2 v2)
       | While e c1 =>
-        TODO_FILL_IN
+        (exists r v1', interp e v1 r /\ run fuel' v1 c1 v1' /\ run fuel' v1' (While e c1) v2)
+          \/ (interp e v1 0 /\ v1 = v2 /\ eval v1 (While e c1) v2)
       end
     end.
 
@@ -353,7 +436,52 @@ Module Impl.
       run fuel v1 c v2 ->
       eval v1 c v2.
   Proof.
-  Admitted.
+    first_order.
+    induct fuel; simplify.
+    equality.
+    cases c; simplify.
+    rewrite H.
+    eapply EvalSkip.
+    invert H.
+    eapply EvalAssign.
+    propositional.
+    apply interp_to_values.
+    apply H.
+    equality.
+    destruct H.
+    eapply EvalSeq.
+    propositional.
+    apply IHfuel in H0.
+    apply H0.
+    propositional.
+    apply IHfuel in H1.
+    apply H1.
+    propositional.
+    destruct H0.
+    propositional.
+    eapply EvalIfTrue.
+    eapply interp_to_values.
+    apply H0.
+    propositional.
+    eapply IHfuel.
+    equality.
+    eapply EvalIfFalse.
+    eapply interp_to_values.
+    equality.
+    eapply IHfuel.
+    equality.
+    propositional.
+    destruct H0.
+    destruct H.
+    propositional.
+    eapply EvalWhileTrue.
+    eapply interp_to_values.
+    apply H0.
+    eapply IHfuel.
+    apply H.
+    apply IHfuel in H2.
+    equality.
+  Qed.
 
   (* To prove the other direction, we will need the following lemma, which shows
      that excess fuel isn't an issue.
@@ -380,14 +508,67 @@ Module Impl.
       run fuel1 v1 c v2 ->
       run fuel2 v1 c v2.
   Proof.
-  Admitted.
+    simplify.
+    induct fuel1.
+    cases c; repeat match goal with
+    | [ |- context[?X] ] => simplify; eauto; equality
+    end.
+    cases fuel2; cases c; simplify;
+      try linear_arithmetic;
+      try equality.
+    destruct H0.
+    propositional.
+    eapply IHfuel1 in H1.
+    eapply IHfuel1 in H2.
+    assert (run fuel2 v1 c1 x /\ run fuel2 x c2 v2).
+    propositional.
+    apply H1.
+    apply H2.
+    first_order.
+    linear_arithmetic.
+    linear_arithmetic.
+    propositional.
+    destruct H1.
+    propositional.
+    eapply IHfuel1 in H3.
+    assert (interp e v1 x /\ (x = 0 -> False) /\ run fuel2 v1 c1 v2).
+    split.
+    equality.
+    split.
+    equality.
+    apply H3.
+    first_order.
+    linear_arithmetic.
+    eapply IHfuel1 in H2.
+    assert (interp e v1 0 /\ run fuel2 v1 c2 v2).
+    split.
+    equality.
+    apply H2.
+    first_order.
+    linear_arithmetic.
+    propositional.
+    destruct H1.
+    destruct H0.
+    propositional.
+    eapply IHfuel1 in H0.
+    eapply IHfuel1 in H3.
+    assert (interp e v1 x /\ run fuel2 v1 c x0 /\ run fuel2 x0 (While e c) v2).
+    split.
+    apply H1.
+    split.
+    apply H0.
+    apply H3.
+    first_order.
+    linear_arithmetic.
+    linear_arithmetic.
+  Qed.
 
   (* For the other direction, we could naively start proving it like this: *)
   Theorem eval_to_run: forall v1 c v2,
       eval v1 c v2 -> exists fuel, run fuel v1 c v2.
   Proof.
     induct 1; simplify.
-    (* This proof is relatively short and straightforward, but dealing with
+  (* This proof is relatively short and straightforward, but dealing with
        existentials is not very pleasant!
 
        This problem becomes worse if we make many proofs about "run".  So, instead,
@@ -409,11 +590,14 @@ Module Impl.
      possible too, of course).  You may find the `max` function useful. *)
 
   Definition WRunSkip_statement : Prop :=
-    forall v,
-      wrun v Skip v.
+    forall v, wrun v Skip v.
   Lemma WRunSkip: WRunSkip_statement.
   Proof.
-  Admitted.
+    repeat match goal with
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun; try assert (run 1 v1 q v2); try equality; eauto
+    | [ |- ?X] => unfold X; intros; propositional; simplify
+           end.
+  Qed.
 
   Definition WRunAssign_statement : Prop :=
     forall v x e a,
@@ -421,7 +605,12 @@ Module Impl.
       wrun v (Assign x e) (v $+ (x, a)).
   Lemma WRunAssign: WRunAssign_statement.
   Proof.
-  Admitted.
+    repeat match goal with
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun; try assert (run 1 v1 q v2); try equality; eauto
+    | [ |- ?X] => unfold X; intros; propositional; simplify
+           end; simplify.
+    eauto.
+  Qed.
 
   Definition WRunSeq_statement : Prop :=
     forall v c1 v1 c2 v2,
@@ -430,30 +619,117 @@ Module Impl.
       wrun v (Sequence c1 c2) v2.
   Lemma WRunSeq: WRunSeq_statement.
   Proof.
-  Admitted.
+    unfold WRunSeq_statement.
+    intros.
+    repeat match goal with
+    | [ H : wrun _ _ _ |- _ ] => unfold wrun in H
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun
+           end; simplify.
+    invert H.
+    invert H0.
+    assert (run (max x0 x) v1 c2 v2).
+    apply run_monotone with (fuel1 := x0).
+    linear_arithmetic.
+    equality.
+    assert (run (max x0 x) v c1 v1).
+    apply run_monotone with (fuel1 := x).
+    linear_arithmetic.
+    equality.
+    exists (S (max x0 x)).
+    replace (run (S (max x0 x)) v (Sequence c1 c2) v2) with (exists vmid : valuation, run (max x0 x) v c1 vmid /\ run (max x0 x) vmid c2 v2).
+    eauto 10.
+    equality.
+  Qed.
 
   (* For the next few lemmas, we've left you the job of stating the theorem as
      well as proving it. *)
 
-  Definition WRunIfTrue_statement : Prop. Admitted.
+  Definition WRunIfTrue_statement : Prop :=
+    forall v e a then_ else_ v',
+      values e v a ->
+      a <> 0 ->
+      wrun v then_ v' ->
+      wrun v (If e then_ else_) v'.
   Lemma WRunIfTrue: WRunIfTrue_statement.
   Proof.
-  Admitted.
+    unfold WRunIfTrue_statement.
+    intros.
+    repeat match goal with
+    | [ H : wrun _ _ _ |- _ ] => unfold wrun in H
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun
+           end; simplify.
+    invert H1.
+    exists (S x).
+    simplify.
+    eapply values_to_interp in H.
+    eauto 10.
+  Qed.
 
-  Definition WRunIfFalse_statement : Prop. Admitted.
+  Definition WRunIfFalse_statement : Prop :=
+    forall v e then_ else_ v',
+      values e v 0 ->
+      wrun v else_ v' ->
+      wrun v (If e then_ else_) v'.
   Lemma WRunIfFalse: WRunIfFalse_statement.
   Proof.
-  Admitted.
+    unfold WRunIfFalse_statement.
+    intros.
+    repeat match goal with
+    | [ H : wrun _ _ _ |- _ ] => unfold wrun in H
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun
+           end; simplify.
+    invert H0.
+    exists (S x).
+    simplify.
+    eapply values_to_interp in H.
+    eauto 10.
+  Qed.
 
-  Definition WRunWhileTrue_statement : Prop. Admitted.
+  Definition WRunWhileTrue_statement : Prop :=
+    forall v e a body v' v'',
+      values e v a
+      -> wrun v body v'
+      -> wrun v' (While e body) v''
+      -> wrun v (While e body) v''.
   Lemma WRunWhileTrue: WRunWhileTrue_statement.
   Proof.
-  Admitted.
+    unfold WRunWhileTrue_statement.
+    intros.
+    repeat match goal with
+    | [ H : wrun _ _ _ |- _ ] => unfold wrun in H
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun
+           end; simplify.
+    invert H0.
+    invert H1.
+    exists (S (max x0 x) + 1).
+    simplify.
+    eapply values_to_interp in H.
+    eapply run_monotone in H0.
+    eapply run_monotone in H2.
+    eauto 10.
+    linear_arithmetic.
+    linear_arithmetic.
+  Qed.
 
-  Definition WRunWhileFalse_statement : Prop. Admitted.
+  Definition WRunWhileFalse_statement : Prop :=
+    forall v1 e body,
+      values e v1 0
+      -> wrun v1 (While e body) v1.
   Lemma WRunWhileFalse: WRunWhileFalse_statement.
   Proof.
-  Admitted.
+    unfold WRunWhileFalse_statement.
+    intros.
+    repeat match goal with
+    | [ H : wrun _ _ _ |- _ ] => unfold wrun in H
+    | [ |- context[wrun ?v1 ?q ?v2] ] => unfold wrun
+           end; simplify.
+    exists 2.
+    eapply values_to_interp in H.
+    apply interp_to_values in H as Hn.
+    apply EvalWhileFalse with (body := body) in Hn.
+    remember v1.
+    first_order.
+  Qed.
 
   (* Now, thanks to these helper lemmas, proving the direction from eval to wrun
      becomes easy: *)
@@ -461,7 +737,29 @@ Module Impl.
       eval v1 c v2 ->
       wrun v1 c v2.
   Proof.
-  Admitted.
+    induct 1.
+    eapply WRunSkip.
+    rewrite H0.
+    eapply WRunAssign.
+    eapply values_to_interp in H.
+    equality.
+    eapply WRunSeq.
+    apply IHeval1.
+    apply IHeval2.
+    eapply WRunIfTrue.
+    apply H.
+    equality.
+    equality.
+    eapply WRunIfFalse.
+    equality.
+    equality.
+    eapply WRunWhileTrue.
+    apply H.
+    apply IHeval1.
+    equality.
+    eapply WRunWhileFalse.
+    equality.
+  Qed.
 
   (* Remember when we said earlier that [induct 1] does induction on the proof
      of [eval], whereas [induct c] does induction on the program itself?  Try
@@ -544,7 +842,7 @@ Module Impl.
      we ran out of fuel: *)
   Fixpoint drun(fuel: nat) (v: valuation) (c: cmd): option valuation. Admitted.
 
-  (* More open-ended exercise:
+(* More open-ended exercise:
      Now we have six different definitions of semantics:
 
                           deterministic     nondeterministic
@@ -568,7 +866,7 @@ Module Impl.
      and Fixpoints, you can try to prove some of these implications directly
      and see how much harder than "deval_to_eval" it is (we believe that
      "deval_to_eval" is the simplest one).
-   *)
+ *)
 
 End Impl.
 
