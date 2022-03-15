@@ -1417,7 +1417,7 @@ Lemma _opt_constprop_sound phi : forall c consts v v',
     -> consts $<= v
     -> eval phi v (fst (_opt_constprop c consts)) v'.
 Proof.
-  induct 1; simplify;
+  induct c; simplify;
     try eval_elim; try eval_intro;
     try cases_any; simplify; try eval_elim;
     try eval_intro.
@@ -1427,10 +1427,8 @@ Proof.
   equality.
   admit.
   admit.
-  apply H.
-  rewrite H0.
-  rewrite H1.
-  apply H2.
+  apply H5.
+  apply H10.
   equality.
   admit.
 
