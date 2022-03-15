@@ -1320,11 +1320,11 @@ the assignment entirely — can you see why?
 Fixpoint _opt_constprop (c: cmd) (consts: valuation) : cmd * valuation :=
   match c with
   | Skip => (Skip, consts)
+  | AssignCall x f e1 e2 => (AssignCall x f e1 e2, consts)
   | Assign x e => match (opt_arith_constprop e consts) with
                  | Const k => (Assign x (Const k), consts $+ (x, k))
                  | e' => (Assign x e', consts $- x)
                  end
-  | AssignCall x f e1 e2 => (AssignCall x f e1 e2, consts)
   | Sequence c1 c2 => let (c1', consts') := _opt_constprop c1 consts in
                      let (c2', consts'') := _opt_constprop c2 consts' in
                      (Sequence c1' c2', consts'')
@@ -1383,6 +1383,26 @@ Proof.
   induct e1; simplify; try equality.
 Qed.
 
+Lemma arith_constprop_in_consts_implies : forall e consts v n,
+    consts $<= v
+    -> opt_arith_constprop e consts = Const n
+    -> interp_arith e v = n.
+Proof.
+  intros.
+  induct e; simplify; try equality.
+  cases_any.
+  cases (consts $? x).
+  apply includes_lookup with (m' := v) in Heq0.
+  equality.
+  equality.
+  equality.
+  cases (consts $? x).
+  apply includes_lookup with (m' := v) in Heq0.
+  equality.
+  equality.
+  equality.
+Qed.
+
 Lemma includes_remove_add (consts v: valuation) x n:
   consts $<= v ->
   consts $- x $<= v $+ (x, n).
@@ -1391,6 +1411,28 @@ Proof.
   cases (x ==v k); subst; simplify; try equality.
   eauto using includes_lookup.
 Qed.
+
+Lemma _opt_constprop_sound phi : forall c consts v v',
+    eval phi v c v'
+    -> consts $<= v
+    -> eval phi v (fst (_opt_constprop c consts)) v'.
+Proof.
+  induct 1; simplify;
+    try eval_elim; try eval_intro;
+    try cases_any; simplify; try eval_elim;
+    try eval_intro.
+  simplify.
+  apply arith_constprop_in_consts_implies with (v := v) in Heq.
+  equality.
+  equality.
+  admit.
+  admit.
+  apply H.
+  rewrite H0.
+  rewrite H1.
+  apply H2.
+  equality.
+  admit.
 
 Lemma opt_constprop_sound phi : forall c v v',
     eval phi v c v' ->
@@ -1419,6 +1461,16 @@ Proof.
   equality.
   apply H9.
   equality.
+  admit.
+  simplify.
+  cases c1; cases c2; simplify;
+    try eval_elim;
+    try eval_elim;
+    try eval_intro;
+    try eval_intro.
+  rewrite arith_constprop_in_empty_is_expression.
+  cases e; try eval_elim; try eval_elim;
+    try eval_intro; try eval_intro; try equality.
 Admitted.
 
 (*|
