@@ -9,7 +9,7 @@
  * 'git submodule update; make -C frap lib' at the root of this repo should do
  * it. *)
 
- Require Import Pset6Sig.
+Require Import Pset6Sig.
 
 (*|
 Modern compilers achieve excellent performance by leveraging a wide variety of
@@ -87,6 +87,7 @@ optimizations.
 |*)
 
 Module Impl.
+
 
 (*|
 Language definition
@@ -171,9 +172,9 @@ Example Times3Plus1Body :=
 Example FactBody :=
   ("f" <- 1;;
    while "n" loop
-     "f" <- "f" * "n";;
-     "n" <- "n" - 1
-   done).
+         "f" <- "f" * "n";;
+   "n" <- "n" - 1
+                 done).
 
 Example FactRecBody :=
   (when "n" == 1 then
@@ -181,26 +182,26 @@ Example FactRecBody :=
    else
      "f" <- call1 "fact_r" ("n" - 1);;
      "f" <- "f" * "n"
-   done).
+                   done).
 
 Example FactTailRecBody :=
   (when "n" == 1 then
      "f" <- "acc"
    else
      "f" <- call2 "fact_tr" ("n" - 1) ("acc" * "n")
-   done).
+                 done).
 
 Example CollatzBody :=
   (when ("start" == 1) then
      Skip
    else when ("start" mod 2 == 0) then
-          "start" <- "start" / 2
-        else
-          (* `call1 f arg` is short for `call2 f arg 0` *)
-          "start" <- call1 "times3plus1" ("start" + 0)
-        done;;
-        "flight" <- call2 "collatz" "start" ("flight" + 1)
-   done).
+     "start" <- "start" / 2
+   else
+     (* `call1 f arg` is short for `call2 f arg 0` *)
+     "start" <- call1 "times3plus1" ("start" + 0)
+                     done;;
+     "flight" <- call2 "collatz" "start" ("flight" + 1)
+                      done).
 
 (*|
 The coercions defined in the previous section make programs easier to write by
@@ -320,62 +321,40 @@ Here is how it looks in Coq:
 Definition environment := fmap string ((var * var) * var * cmd).
 
 Inductive eval (phi: environment): valuation -> cmd -> valuation -> Prop :=
-  | EvalSkip: forall v,
-      eval phi v Skip v
-  | EvalAssign: forall v x e a,
-      interp_arith e v = a ->
-      eval phi v (Assign x e) (v $+ (x, a))
-  | EvalAssignCall: forall x f e1 e2 x1 x2 y body a1 a2 a v v',
+| EvalSkip: forall v,
+    eval phi v Skip v
+| EvalAssign: forall v x e a,
+    interp_arith e v = a ->
+    eval phi v (Assign x e) (v $+ (x, a))
+| EvalAssignCall: forall x f e1 e2 x1 x2 y body a1 a2 a v v',
     phi $? f = Some ((x1, x2), y, body) ->
     interp_arith e1 v = a1 ->
     interp_arith e2 v = a2 ->
     eval phi ($0 $+ (x1, a1) $+ (x2, a2)) body v' ->
     v' $? y = Some a ->
     eval phi v (AssignCall x f e1 e2) (v $+ (x, a))
-  | EvalSequence: forall v c1 v1 c2 v2,
-      eval phi v c1 v1 ->
-      eval phi v1 c2 v2 ->
-      eval phi v (Sequence c1 c2) v2
-  | EvalIfTrue: forall v e thn els v' c,
-      interp_arith e v = c ->
-      c <> 0 ->
-      eval phi v thn v' ->
-      eval phi v (If e thn els) v'
-  | EvalIfFalse: forall v e thn els v',
-      interp_arith e v = 0 ->
-      eval phi v els v' ->
-      eval phi v (If e thn els) v'
-  | EvalWhileTrue: forall v e body v' v'' c,
-      interp_arith e v = c ->
-      c <> 0 ->
-      eval phi v body v' ->
-      eval phi v' (While e body) v'' ->
-      eval phi v (While e body) v''
-  | EvalWhileFalse: forall v e body,
-      interp_arith e v = 0 ->
-      eval phi v (While e body) v.
-
-(*|
-As a sanity check, we can prove that the semantics is deterministic:
-|*)
-
-
-Lemma eval_deterministic :
-  forall phi c v0 v1 v2,
-    eval phi v0 c v1 ->
-    eval phi v0 c v2 ->
-    v1 = v2.
-Proof.
-Admitted.
-
-(*|
-Now let's check that our semantics compute the right values.  The `eval_intro`
-tactic below may be useful for the following proofs.  You do not need to
-understand its implementation; what matters is that it attempts to construct a
-proof of `eval`, and it chooses between `EvalWhileTrue` and `EvalWhileFalse` and
-between `EvalIfTrue` and `EvalIfFalse` by attempting to satisfy all the premises
-of each of them.  It stops if it cannot conclusively decide which case applies.
-|*)
+| EvalSequence: forall v c1 v1 c2 v2,
+    eval phi v c1 v1 ->
+    eval phi v1 c2 v2 ->
+    eval phi v (Sequence c1 c2) v2
+| EvalIfTrue: forall v e thn els v' c,
+    interp_arith e v = c ->
+    c <> 0 ->
+    eval phi v thn v' ->
+    eval phi v (If e thn els) v'
+| EvalIfFalse: forall v e thn els v',
+    interp_arith e v = 0 ->
+    eval phi v els v' ->
+    eval phi v (If e thn els) v'
+| EvalWhileTrue: forall v e body v' v'' c,
+    interp_arith e v = c ->
+    c <> 0 ->
+    eval phi v body v' ->
+    eval phi v' (While e body) v'' ->
+    eval phi v (While e body) v''
+| EvalWhileFalse: forall v e body,
+    interp_arith e v = 0 ->
+    eval phi v (While e body) v.
 
 Ltac eval_intro :=
   let eval_intro_solve :=
@@ -402,6 +381,78 @@ Ltac eval_intro :=
   | [  |- interp_arith _ _ = _ _ ] => econstructor
   | _ => progress simplify || equality
   end.
+
+Lemma WhileTrue_inv : forall phi v e body v'' c,
+    interp_arith e v = c ->
+    c <> 0 ->
+    eval phi v (While e body) v'' ->
+    exists v',
+      eval phi v body v' /\
+      eval phi v' (While e body) v''.
+Proof. simplify; invert H1; eauto || equality. Qed.
+
+Lemma WhileFalse_inv : forall phi v e body v',
+    interp_arith e v = 0 ->
+    eval phi v (While e body) v' ->
+    v = v'.
+Proof. simplify; invert H0; eauto || equality. Qed.
+
+Ltac eval_elim :=
+  match goal with
+  | [ H: Some _ = Some _ |- _ ] => invert H
+  | [ H: interp_arith _ _ = _ _ |- _ ] => invert H
+  | [ H: eval _ _ Skip _ |- _ ] => invert H
+  | [ H: eval _ _ (Assign _ _) _ |- _ ] => invert H
+  | [ H: eval _ _ (AssignCall _ _ _ _) _ |- _ ] => invert H
+  | [ H: eval _ _ (Sequence _ _) _ |- _ ] => invert H
+  | [ H: eval _ _ (If _ _ _) _ |- _ ] => invert H
+  | [ H: eval _ _ (While _ _) _ |- _ ] =>
+    eapply WhileTrue_inv in H;
+    [ destruct H as (? & ? & ?) |
+      solve [repeat (econstructor || simplify)] |
+      equality ]
+  | [ H: eval _ _ (While _ _) _ |- _ ] =>
+    apply WhileFalse_inv in H;
+    [ subst |
+      solve [repeat (econstructor || simplify)] ]
+  | [ H: context[if ?c then _ else _] |- _ ] => cases c
+  | _ => simplify
+  end.
+
+(*|
+As a sanity check, we can prove that the semantics is deterministic:
+|*)
+
+Lemma eval_deterministic : forall phi c v0 v1 v2,
+    eval phi v0 c v1
+    -> eval phi v0 c v2
+    -> v1 = v2.
+  Proof.
+    intros.
+    induct c; try repeat eval_elim; try repeat eval_intro;
+      try equality.
+    admit.
+    apply IHc1 with (v1 := v3) (v2 := v4) in H4.
+    eapply IHc2.
+    apply H7.
+    equality.
+    assumption.
+    eapply IHc1.
+    apply H9.
+    assumption.
+    eapply IHc2.
+    apply H8.
+    assumption.
+Admitted.
+
+(*|
+Now let's check that our semantics compute the right values.  The `eval_intro`
+tactic below may be useful for the following proofs.  You do not need to
+understand its implementation; what matters is that it attempts to construct a
+proof of `eval`, and it chooses between `EvalWhileTrue` and `EvalWhileFalse` and
+between `EvalIfTrue` and `EvalIfFalse` by attempting to satisfy all the premises
+of each of them.  It stops if it cannot conclusively decide which case applies.
+|*)
 
 (*|
 To call functions, we need to specify their signatures:
@@ -459,7 +510,7 @@ Proof.
 Qed.
 
 Lemma EvalFact6:
-    eval_returns $0 ($0 $+ ("n", 3)) FactBody "f" 6.
+  eval_returns $0 ($0 $+ ("n", 3)) FactBody "f" 6.
 Proof.
   eexists; propositional; repeat eval_intro.
 Qed.
@@ -471,13 +522,13 @@ Notation Fact_env :=
     $+ ("fact_tr", FactTailRec_signature)).
 
 Lemma EvalFactRec6:
-    eval_returns Fact_env ($0 $+ ("n", 3)) FactRecBody "f"6.
+  eval_returns Fact_env ($0 $+ ("n", 3)) FactRecBody "f"6.
 Proof.
   eexists; propositional; repeat eval_intro.
 Qed.
 
 Lemma EvalFactTailRec6:
-    eval_returns Fact_env ($0 $+ ("n", 3) $+ ("acc", 1)) FactTailRecBody "f" 6.
+  eval_returns Fact_env ($0 $+ ("n", 3) $+ ("acc", 1)) FactTailRecBody "f" 6.
 Proof.
   eexists; propositional; repeat eval_intro.
 Qed.
@@ -488,7 +539,7 @@ Notation Collatz_env :=
     $+ ("times3plus1", TimesThreePlus1_signature)).
 
 Lemma collatz_result:
-    eval_returns Collatz_env ($0 $+ ("flight", 0) $+ ("start", 10)) CollatzBody "flight" 6.
+  eval_returns Collatz_env ($0 $+ ("flight", 0) $+ ("start", 10)) CollatzBody "flight" 6.
 Proof.
   (* This proof is larger, so `eval_intro` will take a bit longer (a few seconds): *)
   eexists; propositional; repeat eval_intro.
@@ -550,20 +601,106 @@ Note that your optimization function should *not* be recursive!  We will
 implement repeated rule application later on top of your function.
 |*)
 
-Definition opt_binop_fold (b: BinopName) (e1 e2: expr) : expr.
-Admitted.
+Definition opt_binop_fold (b: BinopName) (e1 e2: expr) : expr :=
+  match b with
+  | Plus => match (e1, e2) with
+           | (e, Const 0) => e
+           | (Const 0, e) => e
+           | (Const n, Const n0) => Const (n + n0)
+           | (_, _) => Binop Plus e1 e2
+           end
+  | Times => match (e1, e2) with
+            | (_, Const 0) => Const 0
+            | (Const 0, _) => Const 0
+            | (e1', e2') => Binop Times e1' e2'
+            end
+  | Divide => match (e1, e2) with
+             | (e, Const 1) => e
+             | (_, _) => Binop Divide e1 e2
+             end
+  | _ => Binop b e1 e2
+  end.
+
 Arguments opt_binop_fold !_ !_ !_ /. (* Coq magic *)
 
 Example opt_binop_fold_test1 :
   opt_binop_fold Plus "x" 0 = "x".
 Proof.
-Admitted.
+  eval_intro.
+  equality.
+Qed.
 
 Lemma opt_binop_fold_sound : forall b e1 e2 v,
     interp_arith (opt_binop_fold b e1 e2) v =
     interp_binop b (interp_arith e1 v) (interp_arith e2 v).
 Proof.
-Admitted.
+  eval_intro.
+  induct b; simplify; try equality.
+  cases e1.
+  cases e2.
+  cases n.
+  cases n0; simplify; try equality.
+  simplify.
+  cases n.
+  cases n0.
+  simplify.
+  equality.
+  cases n0; simplify; try equality; try linear_arithmetic.
+  cases n0; simplify; try equality; try linear_arithmetic.
+  simplify.
+  cases n.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  simplify.
+  cases n; simplify; try equality.
+  simplify.
+  cases (v $? x); simplify; try equality.
+  cases e2; simplify; try equality.
+  cases n0; simplify; try equality; try linear_arithmetic.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  cases e2; simplify; try equality.
+  cases n; simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  cases (v $? x); simplify; try equality.
+  simplify.
+  cases e2; simplify; try equality.
+  cases n; simplify; try equality.
+  linear_arithmetic.
+  cases e2; simplify; try equality.
+  cases n; simplify; try equality.
+  cases n; simplify; try equality.
+  replace (opt_binop_fold Divide e1 (Const 1)) with (e1).
+  symmetry.
+  eapply Nat.div_1_r.
+  equality.
+  cases e1.
+  cases n; simplify; try equality; try linear_arithmetic.
+  cases e2.
+  cases n; simplify; try equality; try linear_arithmetic.
+  simplify.
+  cases (v $? x); simplify; try equality.
+  simplify.
+  equality.
+  cases e2.
+  simplify.
+  cases n0; simplify; try equality; try linear_arithmetic.
+  equality.
+  simplify.
+  equality.
+  cases e2.
+  cases n; simplify; try equality; try linear_arithmetic.
+  equality.
+  equality.
+  cases e2.
+  cases n; simplify; try equality; try linear_arithmetic.
+  equality.
+  equality.
+Qed.
 
 (*|
 Precomputation
@@ -579,15 +716,39 @@ Note that your optimization function should *not* be recursive!  We will
 implement repeated rule application later on top of your function.
 |*)
 
-Definition opt_binop_precompute (b: BinopName) (e1 e2: expr) : expr.
-Admitted.
+Definition opt_binop_precompute (b: BinopName) (e1 e2: expr) : expr :=
+  match (e1, e2) with
+  | (Const n1, Const n2) =>
+    match b with
+    | LogAnd => Const (Nat.land n1 n2)
+    | Eq => if (n1 ==n n2) then Const 1 else Const 0
+    | Plus => Const (n1 + n2)
+    | Minus => Const (n1 - n2)
+    | Times => Const (n1 * n2)
+    | Divide => Const (n1 / n2)
+    | ShiftLeft => Const (Nat.shiftl n1 n2)
+    | ShiftRight => Const (Nat.shiftr n1 n2)
+    | Modulo => Const (Nat.modulo n1 n2)
+    end
+  | (_, _) => Binop b e1 e2
+  end.
+
 Arguments opt_binop_precompute !_ !_ !_ /. (* Coq magic *)
 
 Lemma opt_binop_precompute_sound : forall b e1 e2 v,
     interp_arith (opt_binop_precompute b e1 e2) v =
     interp_binop b (interp_arith e1 v) (interp_arith e2 v).
 Proof.
-Admitted.
+  intros.
+  cases e1.
+  cases e2.
+  cases b; simplify; try equality.
+  cases (n ==n n0); try equality.
+  equality.
+  equality.
+  equality.
+  equality.
+Qed.
 
 (*|
 Optimizing power-of-2 operations
@@ -615,17 +776,17 @@ Definition log2 (n: nat) :=
 Lemma log2_sound : forall n l, log2 n = Some l -> n = 2^l.
 Proof.
   unfold log2; simplify;
-     repeat match goal with
-            | [ H: context[if ?c then _ else _] |- _ ] => cases c
-            | [ H: Some _ = Some _ |- _ ] => invert H
-            end; equality.
+    repeat match goal with
+           | [ H: context[if ?c then _ else _] |- _ ] => cases c
+           | [ H: Some _ = Some _ |- _ ] => invert H
+           end; equality.
 Qed.
 
 Lemma log2_complete : forall n, log2 n = None -> forall l, n <> 2^l.
 Proof.
   unfold log2, not; simplify;
     replace l with (Nat.log2 n) in *
-    by (subst; rewrite Nat.log2_pow2; eauto using Nat.le_0_l).
+      by (subst; rewrite Nat.log2_pow2; eauto using Nat.le_0_l).
   match goal with
   | [ H: context[if ?c then _ else _] |- _ ] => cases c
   end; try equality.
@@ -735,27 +896,45 @@ applies all optimizations that you implemented and proved (at least
 Mind the order in which the optimizations are applied!
 |*)
 
-Definition opt_arith (e: expr) : expr.
-Admitted.
+Fixpoint opt_arith (e: expr) : expr :=
+  match e with
+  | Const n => Const n
+  | Var x => Var x
+  | Binop b e1 e2 => let e' := opt_binop_precompute b (opt_arith e1) (opt_arith e2) in
+                    match e' with
+                    | Binop b' e1' e2' => opt_binop_fold b' e1' e2'
+                    | _ => e'
+                    end
+  end.
+
 Arguments opt_arith !e /. (* Coq magic *)
 
 Example opt_arith_fold_test1 :
   opt_arith (1 + "z" * ("y" * ("x" * (0 + 0 / 1))))%expr =
   (1)%expr.
 Proof.
-Admitted.
+  unfold opt_arith.
+  simplify.
+  equality.
+Qed.
 
 Example opt_arith_precompute_test1:
   opt_arith (("x" + (3 - 3)) / (0 + 1) + ("y" + "y" * 0))%expr =
   ("x" + "y")%expr.
 Proof.
-Admitted.
+  unfold opt_arith.
+  simplify.
+  equality.
+Qed.
 
 Example opt_arith_precompute_test2 :
   opt_arith ((("y" / ("x" * 0 + 7 / 1)) mod (12 - 5)) / (2 * 3))%expr =
   (("y" / 7) mod 7 / 6)%expr.
 Proof.
-Admitted.
+  unfold opt_arith.
+  simplify.
+  equality.
+Qed.
 
 Example opt_arith_log2_test1 :
   opt_arith (("y" * 8) mod 8 / 4)%expr =
@@ -781,11 +960,31 @@ Example opt_arith_bitwise_test2 :
 Proof.
 Admitted.
 
-
 Lemma opt_arith_sound : forall e v,
     interp_arith (opt_arith e) v =
     interp_arith e v.
 Proof.
+  induct e; simplify; try equality.
+  cases (opt_binop_precompute b (opt_arith e1) (opt_arith e2)); simplify.
+  cases b; cases (opt_arith e1); cases (opt_arith e2); simplify; try equality.
+  rewrite <- IHe2.
+  rewrite <- IHe1.
+  cases (n0 ==n n1).
+  equality.
+  equality.
+  cases (v $? x).
+  cases b; cases (opt_arith e1); cases (opt_arith e2); simplify; try equality.
+  rewrite <- IHe2.
+  rewrite <- IHe1.
+  cases (n0 ==n n1).
+  equality.
+  equality.
+  cases b; cases (opt_arith e1); cases (opt_arith e2); simplify; try equality.
+  rewrite <- IHe2.
+  rewrite <- IHe1.
+  cases (n ==n n0).
+  equality.
+  equality.
 Admitted.
 
 (*|
@@ -835,74 +1034,195 @@ which we remove instances of `Skip`.  The following helper function might be use
 Definition is_skip (c: cmd) : sumbool (c = Skip) (c <> Skip) :=
   ltac:(cases c; econstructor; equality).
 
-Fixpoint opt_unskip (c: cmd) : cmd.
-Admitted.
+Fixpoint opt_unskip (c: cmd) : cmd :=
+  match c with
+  | Skip => Skip
+  | Assign v e => Assign v e
+  | AssignCall x f e1 e2 => AssignCall x f e1 e2
+  | Sequence c1 c2 => match (opt_unskip c1, opt_unskip c2) with
+                     | (Skip, Skip) => Skip
+                     | (c1', Skip) => c1'
+                     | (Skip, c2') => c2'
+                     | (c1', c2') => Sequence c1' c2'
+                     end
+  | If e1 c1 c2 => If e1 (opt_unskip c1) (opt_unskip c2)
+  | While e c1 => While e (opt_unskip c1)
+  end.
 
 Example opt_unskip_test1 :
   opt_unskip (Skip;; (Skip;; Skip);; (Skip;; Skip;; Skip)) =
   Skip.
 Proof.
-Admitted.
+  simplify.
+  equality.
+Qed.
 
 Example opt_unskip_test2 :
   opt_unskip (when 0 then (Skip;; Skip) else Skip done;;
-              while 0 loop Skip;; Skip done;; Skip) =
+                                             while 0 loop Skip;; Skip done;; Skip) =
   (when 0 then Skip else Skip done;; while 0 loop Skip done).
 Proof.
-Admitted.
-
-(*|
-Now let's prove this optimization correct.  The following two lemmas and the
-`eval_elim` tactic below are provided for your convenience.  `eval_elim` is the
-dual of `eval_intro`: it automatically inverts `eval` hypotheses, as long as it
-can do so without creating new goals.
-|*)
-
-Lemma WhileTrue_inv : forall phi v e body v'' c,
-    interp_arith e v = c ->
-    c <> 0 ->
-    eval phi v (While e body) v'' ->
-    exists v',
-      eval phi v body v' /\
-      eval phi v' (While e body) v''.
-Proof. simplify; invert H1; eauto || equality. Qed.
-
-Lemma WhileFalse_inv : forall phi v e body v',
-    interp_arith e v = 0 ->
-    eval phi v (While e body) v' ->
-    v = v'.
-Proof. simplify; invert H0; eauto || equality. Qed.
-
-Ltac eval_elim :=
-  match goal with
-  | [ H: Some _ = Some _ |- _ ] => invert H
-  | [ H: interp_arith _ _ = _ _ |- _ ] => invert H
-  | [ H: eval _ _ Skip _ |- _ ] => invert H
-  | [ H: eval _ _ (Assign _ _) _ |- _ ] => invert H
-  | [ H: eval _ _ (AssignCall _ _ _ _) _ |- _ ] => invert H
-  | [ H: eval _ _ (Sequence _ _) _ |- _ ] => invert H
-  | [ H: eval _ _ (While _ _) _ |- _ ] =>
-    eapply WhileTrue_inv in H;
-    [ destruct H as (? & ? & ?) |
-      solve [repeat (econstructor || simplify)] |
-      equality ]
-  | [ H: eval _ _ (While _ _) _ |- _ ] =>
-    apply WhileFalse_inv in H;
-    [ subst |
-      solve [repeat (econstructor || simplify)] ]
-  | [ H: context[if ?c then _ else _] |- _ ] => cases c
-  | _ => simplify
-  end.
-
-(*|
-You do not need to understand or use `eval_elim`, though you may be curious to
-look at how it's implemented.
-|*)
+  simplify.
+  equality.
+Qed.
 
 Lemma opt_unskip_sound phi : forall c v v',
     eval phi v c v' ->
     eval phi v (opt_unskip c) v'.
 Proof.
+  induct 1; simplify; try repeat eval_elim; try repeat eval_intro;
+    try equality.
+  apply H.
+  rewrite H0.
+  rewrite H1.
+  apply H2.
+  assumption.
+
+  admit.
+  (*cases (opt_unskip c2); cases (opt_unskip c1).
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  apply H4.
+  apply H6.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  assumption.
+  eval_intro.
+  assumption.
+  eval_elim.
+  assumption.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  equality.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  apply H11.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  apply H4.
+  apply H6.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  apply H8.
+  eval_intro.
+  equality.
+  eval_intro.
+  eval_intro.
+  apply H7.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_intro.
+  apply IHeval1.
+  eval_intro.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  apply H11.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  equality.
+  eval_intro.
+  apply H5.
+  eval_intro.
+  eval_intro.
+  apply H10.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  apply H6.
+  equality.
+  equality.
+  apply H13.
+  apply H14.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  equality.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  apply H4.
+  apply H7.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  assumption.
+  eval_elim.
+  eval_elim.
+  eval_intro.
+  eval_intro.
+  apply H9.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  assumption.
+  eval_intro.
+  eval_intro.
+  apply H8.
+  eval_intro.
+  apply H5.
+  equality.
+  equality.
+  apply H10.
+  equality. *)
+  apply IHeval1.
+  assumption.
 Admitted.
 
 (*|
@@ -928,8 +1248,15 @@ Since there are no assignments in expressions, this is just a matter of
 substituting known values recursively:
 |*)
 
-Fixpoint opt_arith_constprop (c: expr) (consts: valuation) {struct c} : expr.
-Admitted.
+Fixpoint opt_arith_constprop (c: expr) (consts: valuation) {struct c} : expr :=
+  match c with
+  | Const n => Const n
+  | Var x => match consts $? x with
+            | Some k => Const k
+            | None => Var x
+            end
+  | Binop b e1 e2 => Binop b (opt_arith_constprop e1 consts) (opt_arith_constprop e2 consts)
+  end.
 
 (*|
 What is the correctness criterion for constant propagation?  The environment of
@@ -945,7 +1272,26 @@ Lemma opt_arith_constprop_sound : forall e v consts,
     interp_arith (opt_arith_constprop e consts) v =
     interp_arith e v.
 Proof.
-Admitted.
+  intros.
+  induct e; simplify.
+  equality.
+  cases (consts $? x); simplify.
+  cases (v $? x); simplify.
+  apply includes_lookup with (m' := v) in Heq.
+  equality.
+  equality.
+  apply includes_lookup with (m' := v) in Heq.
+  equality.
+  equality.
+  cases (v $? x); simplify.
+  equality.
+  equality.
+  eapply IHe1 in H as H1.
+  eapply IHe2 in H as H2.
+  rewrite H1.
+  rewrite H2.
+  equality.
+Qed.
 
 (*|
 We can now define constant propagation on commands.  Propagating constants
@@ -971,16 +1317,37 @@ example).  But in fact, the assignment *should be kept*: it's not safe to remove
 the assignment entirely — can you see why?
 |*)
 
+Fixpoint _opt_constprop (c: cmd) (consts: valuation) : cmd * valuation :=
+  match c with
+  | Skip => (Skip, consts)
+  | Assign x e => match (opt_arith_constprop e consts) with
+                 | Const k => (Assign x (Const k), consts $+ (x, k))
+                 | e' => (Assign x e', consts $- x)
+                 end
+  | AssignCall x f e1 e2 => (AssignCall x f e1 e2, consts)
+  | Sequence c1 c2 => let (c1', consts') := _opt_constprop c1 consts in
+                     let (c2', consts'') := _opt_constprop c2 consts' in
+                     (Sequence c1' c2', consts'')
+  | If e c1 c2 => let e' := opt_arith_constprop e consts in
+                 let (c1', _) := _opt_constprop c1 consts in
+                 let (c2', _) := _opt_constprop c2 consts in
+                 (If e' c1' c2', consts)
+  | While e c1 => let e' := opt_arith_constprop e $0 in
+                 let (c1', _) := _opt_constprop c1 $0 in
+                 (While e' c1', consts)
+  end.
 
-(* HINT 1-2 (see Pset6Sig.v) *) 
-Definition opt_constprop (c: cmd) : cmd.
-Admitted.
+Definition opt_constprop (c: cmd) : cmd := fst (_opt_constprop c $0).
+
 Arguments opt_constprop !_ /. (* Coq magic *)
 
 Example opt_constprop_test1 :
   opt_constprop FactBody = FactBody.
 Proof.
-Admitted.
+  unfold opt_constprop; simplify.
+  unfold FactBody.
+  equality.
+Qed.
 
 Example opt_constprop_test2 :
   opt_constprop ("x" <- 7;; "y" <- "x";;
@@ -988,23 +1355,70 @@ Example opt_constprop_test2 :
                    "z" <- "x";; "t" <- "z";; while "t" loop "t" <- "t" - 1 done
                  else
                    "z" <- "u" + "x";; "t" <- "z"
-                 done;;
-                 "r" <- "z") =
- ("x" <- 7;; "y" <- 7;;
-  when 7 mod "w" then
-    "z" <- 7;; "t" <- 7;; while "t" loop "t" <- "t" - 1 done
-  else
-    "z" <- "u" + 7;; "t" <- "z"
-  done;;
-  "r" <- "z").
+                                             done;;
+                   "r" <- "z") =
+  ("x" <- 7;; "y" <- 7;;
+   when 7 mod "w" then
+     "z" <- 7;; "t" <- 7;; while "t" loop "t" <- "t" - 1 done
+   else
+     "z" <- "u" + 7;; "t" <- "z"
+                             done;;
+     "r" <- "z").
 Proof.
-Admitted.
+  unfold opt_constprop.
+  simplify.
+  equality.
+Qed.
 
+Lemma arith_constprop_in_empty_is_expression : forall e,
+    opt_arith_constprop e $0 = e.
+Proof.
+  induct e; simplify; try equality.
+Qed.
+
+Lemma arith_constprop_in_empty_equality_implies : forall e1 e2,
+    opt_arith_constprop e1 $0 = e2 -> e1 = e2.
+Proof.
+  generalize arith_constprop_in_empty_is_expression.
+  induct e1; simplify; try equality.
+Qed.
+
+Lemma includes_remove_add (consts v: valuation) x n:
+  consts $<= v ->
+  consts $- x $<= v $+ (x, n).
+Proof.
+  simplify; apply includes_intro; simplify.
+  cases (x ==v k); subst; simplify; try equality.
+  eauto using includes_lookup.
+Qed.
 
 Lemma opt_constprop_sound phi : forall c v v',
     eval phi v c v' ->
     eval phi v (opt_constprop c) v'.
 Proof.
+  intros.
+  induct c; simplify; try eval_elim; try eval_intro.
+  cases (opt_arith_constprop e $0).
+  eval_elim.
+  eval_intro.
+  eapply arith_constprop_in_empty_equality_implies in Heq.
+  rewrite Heq.
+  equality.
+  eval_elim.
+  eval_intro.
+  eapply arith_constprop_in_empty_equality_implies in Heq.
+  rewrite Heq.
+  equality.
+  eval_elim.
+  eval_intro.
+  eapply arith_constprop_in_empty_equality_implies in Heq.
+  rewrite Heq.
+  equality.
+  apply H4.
+  equality.
+  equality.
+  apply H9.
+  equality.
 Admitted.
 
 (*|
@@ -1135,31 +1549,31 @@ can refer to them using `Mod2.…`, e.g. `Mod2.small`:
 |*)
 
 Module Mod2.
-  Lemma even_not_one n: n mod 2 = 0 -> n <> 1.
-  Proof. cases n; try cases n; simplify; linear_arithmetic. Qed.
+Lemma even_not_one n: n mod 2 = 0 -> n <> 1.
+Proof. cases n; try cases n; simplify; linear_arithmetic. Qed.
 
-  Lemma small n: n mod 2 = 0 \/ n mod 2 = 1.
-  Proof. pose proof Nat.mod_upper_bound n 2; linear_arithmetic. Qed.
+Lemma small n: n mod 2 = 0 \/ n mod 2 = 1.
+Proof. pose proof Nat.mod_upper_bound n 2; linear_arithmetic. Qed.
 
-  Lemma pm n: n <> 0 -> (n - 1) mod 2 = (n + 1) mod 2.
-  Proof.
-    erewrite <- Nat.mod_add with (b := 1); simplify.
-    f_equal. all: linear_arithmetic.
-  Qed.
+Lemma pm n: n <> 0 -> (n - 1) mod 2 = (n + 1) mod 2.
+Proof.
+  erewrite <- Nat.mod_add with (b := 1); simplify.
+  f_equal. all: linear_arithmetic.
+Qed.
 
-  Lemma even_pred_odd n: n <> 0 -> n mod 2 = 0 -> (n - 1) mod 2 = 1.
-  Proof.
-    simplify; rewrite pm by assumption.
-    rewrite Nat.add_mod by linear_arithmetic.
-    replace (n mod 2); equality.
-  Qed.
+Lemma even_pred_odd n: n <> 0 -> n mod 2 = 0 -> (n - 1) mod 2 = 1.
+Proof.
+  simplify; rewrite pm by assumption.
+  rewrite Nat.add_mod by linear_arithmetic.
+  replace (n mod 2); equality.
+Qed.
 
-  Lemma odd_pred_even n: n mod 2 = 1 -> (n - 1) mod 2 = 0.
-  Proof.
-    simplify; rewrite pm by (cases n; simplify; linear_arithmetic).
-    rewrite Nat.add_mod by linear_arithmetic.
-    replace (n mod 2); equality.
-  Qed.
+Lemma odd_pred_even n: n mod 2 = 1 -> (n - 1) mod 2 = 0.
+Proof.
+  simplify; rewrite pm by (cases n; simplify; linear_arithmetic).
+  rewrite Nat.add_mod by linear_arithmetic.
+  replace (n mod 2); equality.
+Qed.
 End Mod2.
 
 (*|
