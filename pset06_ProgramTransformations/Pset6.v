@@ -1764,6 +1764,10 @@ Proof.
   assert (interp_arith (opt_arith_constprop e $0) v' = interp_arith e v').
   eapply opt_arith_constprop_sound.
   apply empty_includes.
+  apply empty_includes.
+  assert (interp_arith (opt_arith_constprop e $0) v' = interp_arith e v').
+  eapply opt_arith_constprop_sound.
+  apply empty_includes.
   eval_intro.
   apply empty_includes.
 Admitted.
