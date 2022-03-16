@@ -1397,7 +1397,7 @@ the assignment entirely — can you see why?
 Fixpoint _opt_constprop (c: cmd) (consts: valuation) : cmd * valuation :=
   match c with
   | Skip => (Skip, consts)
-  | AssignCall x f e1 e2 => (AssignCall x f e1 e2, consts)
+  | AssignCall x f e1 e2 => (AssignCall x f e1 e2, consts $- x)
   | Assign x e => match (opt_arith_constprop e consts) with
                  | Const k => (Assign x (Const k), consts $+ (x, k))
                  | e' => (Assign x e', consts $- x)
@@ -1408,10 +1408,10 @@ Fixpoint _opt_constprop (c: cmd) (consts: valuation) : cmd * valuation :=
   | If e c1 c2 => let e' := opt_arith_constprop e consts in
                  let (c1', _) := _opt_constprop c1 consts in
                  let (c2', _) := _opt_constprop c2 consts in
-                 (If e' c1' c2', consts)
+                 (If e' c1' c2', $0)
   | While e c1 => let e' := opt_arith_constprop e $0 in
                  let (c1', _) := _opt_constprop c1 $0 in
-                 (While e' c1', consts)
+                 (While e' c1', $0)
   end.
 
 Definition opt_constprop (c: cmd) : cmd := fst (_opt_constprop c $0).
@@ -1547,6 +1547,54 @@ Proof.
   equality.
 Qed.
 
+Lemma arith_constprop_in_consts_implies_nonzero : forall e e' consts v,
+    consts $<= v
+    -> opt_arith_constprop e consts = e'
+    -> interp_arith e  v <> 0
+    -> interp_arith e' v <> 0.
+Proof.
+  intros.
+  induct e; cases e'; simplify.
+  equality.
+  cases_any.
+  equality.
+  equality.
+  equality.
+  cases (consts $? x).
+  cases (v $? x).
+  apply includes_lookup with (m' := v) in Heq.
+  equality.
+  equality.
+  equality.
+  equality.
+  cases_any.
+  cases (consts $? x).
+  cases (v $? x).
+  equality.
+  equality.
+  cases (v $? x).
+  equality.
+  equality.
+  cases (consts $? x).
+  cases (v $? x).
+  equality.
+  equality.
+  cases (v $? x).
+  equality.
+  equality.
+  cases (consts $? x).
+  equality.
+  equality.
+  equality.
+  equality.
+  invert H0.
+  rewrite opt_arith_constprop_sound.
+  rewrite opt_arith_constprop_sound.
+  equality.
+  equality.
+  equality.
+Qed.
+
 Lemma arith_constprop_in_empty_equality_implies : forall e1 e2,
     opt_arith_constprop e1 $0 = e2 -> e1 = e2.
 Proof.
@@ -1575,108 +1623,149 @@ Proof.
   eauto using includes_lookup.
 Qed.
 
-Lemma propagate_valuation phi : forall c c' v v1 v' v2,
-    _opt_constprop c v = (c', v')
-    -> eval phi v1 c v2
-    -> v $<= v1 -> v' $<= v2.
+Lemma _opt_constprop_sound phi : forall c consts v v',
+    consts $<= v
+    -> eval phi v c v'
+    -> eval phi v (fst (_opt_constprop c consts)) v' /\ (snd (_opt_constprop c consts) $<= v').
 Proof.
   intros.
-  induct c; try eval_elim;
-    try eval_intro; invert H.
-  equality.
-  cases (opt_arith_constprop e v); simplify.
-  invert H2.
-  remember (interp_arith e v1).
-Admitted.
-
-Lemma _opt_constprop_sound phi : forall c consts v v',
-    eval phi v c v'
-    -> consts $<= v
-    -> eval phi v (fst (_opt_constprop c consts)) v'.
-Proof.
   induct c; simplify;
     try eval_elim; try eval_intro;
     try cases_any; simplify; try eval_elim;
     try eval_intro; simplify.
+  split; try eval_intro.
+  split; try eval_intro.
   apply arith_constprop_in_consts_implies_const with (v := v) in Heq.
+  simplify.
   equality.
   equality.
-  cases_any.
+  apply arith_constprop_in_consts_implies_const with (v := v) in Heq.
+  rewrite Heq.
+  apply includes_add.
+  equality.
+  equality.
+  split; try eval_intro.
   assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Var x0) v).
   rewrite Heq.
   equality.
-  erewrite opt_arith_constprop_sound in H.
-  rewrite H.
-  simplify.
-  cases_any.
+  erewrite opt_arith_constprop_sound in H0.
+  rewrite H0.
   equality.
   equality.
+  apply includes_remove_add.
   equality.
-  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Var x0) v).
-  rewrite Heq.
-  equality.
-  erewrite opt_arith_constprop_sound in H.
-  rewrite H.
-  simplify.
-  cases_any.
-  equality.
-  equality.
-  equality.
+  split; try eval_intro.
   assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Binop b e0_1 e0_2) v).
   rewrite Heq.
   equality.
-  erewrite opt_arith_constprop_sound in H.
-  rewrite H.
-  simplify.
+  erewrite opt_arith_constprop_sound in H0.
   equality.
   equality.
+  apply includes_remove_add.
+  equality.
+  split; try eval_intro.
   apply H5.
+  equality.
+  equality.
   apply H10.
   assumption.
-  cases_any; try eval_elim; try eval_intro.
+  apply includes_remove_add.
+  equality.
+
+  split; try eval_intro; try cases_any; try eval_elim; try eval_intro.
   apply IHc1 with (consts := consts) in H4.
-  rewrite Heq in H4.
+  destruct H4.
+  rewrite Heq in H0.
   simplify.
-  apply H4.
+  apply H0.
+  apply H.
+  apply IHc2 with (consts := v0) in H6.
+  destruct H6.
+  rewrite Heq0 in H0.
+  simplify.
+  equality.
+  apply IHc1 with (consts := consts) in H4.
+  destruct H4.
+  rewrite Heq in H0.
+  rewrite Heq in H1.
+  equality.
   equality.
   apply IHc2 with (consts := v0) in H6.
-  rewrite Heq0 in H6.
+  destruct H6.
+  rewrite Heq0 in H1.
   simplify.
-  assumption.
-  eapply propagate_valuation.
-  apply Heq.
-  apply H4.
   equality.
-  cases_any; try eval_elim; try eval_intro.
-  cases (opt_arith_constprop e consts); simplify.
-  cases n.
+  apply IHc1 with (consts := consts) in H4.
+  destruct H4.
+  rewrite Heq in H0.
+  rewrite Heq in H1.
+  equality.
+  equality.
+
+  split; try eval_intro; try cases_any; try eval_elim; try eval_intro.
+  remember (opt_arith_constprop e consts).
+  assert (interp_arith e0 v <> 0).
+  eapply arith_constprop_in_consts_implies_nonzero.
+  apply H.
+  symmetry.
+  apply Heqe0.
+  equality.
   eval_intro.
-  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Const 0) v).
-  rewrite Heq1.
-  equality.
-  simplify.
-  apply arith_constprop_in_consts_implies_const with (v := v) in Heq1.
-  equality.
-  equality.
   apply IHc1 with (consts := consts) in H8.
-  rewrite Heq in H8.
+  destruct H8.
+  rewrite Heq in H1.
   simplify.
+  apply H1.
+  equality.
+  apply empty_includes.
+
+  split; try eval_intro; try cases_any; try eval_elim; try eval_intro.
+  remember (opt_arith_constprop e consts).
+  assert (interp_arith e0 v = interp_arith (opt_arith_constprop e consts) v).
+  rewrite <- Heqe0.
+  equality.
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith e v).
+  eapply opt_arith_constprop_sound.
+  equality.
+  rewrite H1 in H0.
+  subst.
   eval_intro.
-  assumption.
-  equality.
-  apply IHc1 with (consts := consts) in H8.
-  rewrite Heq in H8.
+  apply IHc2 with (consts := consts) in H7.
+  destruct H7.
+  rewrite Heq0 in H2.
   simplify.
+  equality.
+  equality.
+  apply empty_includes.
+
+  split.
+  invert H0.
+  remember (opt_arith_constprop e consts).
+  assert (interp_arith (opt_arith_constprop e $0) v = interp_arith e v).
+  eapply opt_arith_constprop_sound.
+  apply empty_includes.
+  assert (interp_arith (opt_arith_constprop e $0) v <> 0).
+  rewrite H0.
+  equality.
+  eval_elim.
+  eval_intro.
+  apply IHc with (consts := $0) in H6.
+  destruct H6.
+  rewrite Heq in H0.
+  simplify.
+  apply H0.
+  apply empty_includes.
+
+  remember (opt_arith_constprop e $0).
+  eapply IHc with (consts := $0) in H6.
+  destruct H6.
   admit.
-  admit.
-  admit.
-  cases_any; try eval_elim; try eval_intro.
-  cases (opt_arith_constprop e consts); simplify.
-  admit.
-  cases (opt_arith_constprop e $0).
-  cases n; simplify.
-  eapply arith_constprop_in_empty_equality_implies in Heq0.
-  rewrite Heq0 in H.
+
+  assert (interp_arith (opt_arith_constprop e $0) v' = interp_arith e v').
+  eapply opt_arith_constprop_sound.
+  apply empty_includes.
+  eval_intro.
+  apply empty_includes.
 Admitted.
 
 Lemma opt_constprop_sound phi : forall c v v',
@@ -1686,8 +1775,8 @@ Proof.
   intros.
   unfold opt_constprop.
   eapply _opt_constprop_sound.
-  assumption.
   apply empty_includes.
+  assumption.
 Qed.
 
 (*|
