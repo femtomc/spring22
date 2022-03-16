@@ -88,7 +88,6 @@ optimizations.
 
 Module Impl.
 
-
 (*|
 Language definition
 ===================
@@ -423,27 +422,62 @@ Ltac eval_elim :=
 As a sanity check, we can prove that the semantics is deterministic:
 |*)
 
+Lemma eval_deterministic_1 : forall phi c v0 v1,
+    eval phi v0 c v1
+    -> forall v2, eval phi v0 c v2
+            -> v1 = v2.
+Proof.
+  induct 1.
+  eval_elim.
+  eval_elim.
+  equality.
+  eval_elim.
+  eval_elim.
+  equality.
+  eval_elim.
+  eval_elim.
+  rewrite H9 in H.
+  invert H.
+  eapply IHeval in H14.
+  equality.
+  eval_elim.
+  eval_elim.
+  eapply IHeval1 in H5.
+  rewrite <- H5 in H7.
+  eapply IHeval2 in H7.
+  equality.
+  eval_elim.
+  eval_elim.
+  eapply IHeval in H10.
+  equality.
+  equality.
+  eval_elim.
+  eval_elim.
+  equality.
+  eapply IHeval in H8.
+  equality.
+  eval_elim.
+  eval_elim.
+  eapply IHeval1 in H3.
+  rewrite <- H3 in H4.
+  eapply IHeval2 in H4.
+  equality.
+  eval_elim.
+  invert H0.
+  equality.
+  equality.
+Qed.
+
 Lemma eval_deterministic : forall phi c v0 v1 v2,
     eval phi v0 c v1
     -> eval phi v0 c v2
     -> v1 = v2.
-  Proof.
-    intros.
-    induct c; try repeat eval_elim; try repeat eval_intro;
-      try equality.
-    admit.
-    apply IHc1 with (v1 := v3) (v2 := v4) in H4.
-    eapply IHc2.
-    apply H7.
-    equality.
-    assumption.
-    eapply IHc1.
-    apply H9.
-    assumption.
-    eapply IHc2.
-    apply H8.
-    assumption.
-Admitted.
+Proof.
+  intros.
+  eapply eval_deterministic_1.
+  apply H.
+  assumption.
+Qed.
 
 (*|
 Now let's check that our semantics compute the right values.  The `eval_intro`
@@ -900,10 +934,10 @@ Fixpoint opt_arith (e: expr) : expr :=
   match e with
   | Const n => Const n
   | Var x => Var x
-  | Binop b e1 e2 => let e' := opt_binop_precompute b (opt_arith e1) (opt_arith e2) in
-                    match e' with
+  | Binop b e1 e2 => match opt_binop_precompute b (opt_arith e1) (opt_arith e2) with
+                    | Const n => Const n
+                    | Var x => Var x
                     | Binop b' e1' e2' => opt_binop_fold b' e1' e2'
-                    | _ => e'
                     end
   end.
 
@@ -964,28 +998,39 @@ Lemma opt_arith_sound : forall e v,
     interp_arith (opt_arith e) v =
     interp_arith e v.
 Proof.
-  induct e; simplify; try equality.
-  cases (opt_binop_precompute b (opt_arith e1) (opt_arith e2)); simplify.
-  cases b; cases (opt_arith e1); cases (opt_arith e2); simplify; try equality.
-  rewrite <- IHe2.
-  rewrite <- IHe1.
-  cases (n0 ==n n1).
+  induct e; simplify.
+  equality.
+  cases_any.
   equality.
   equality.
-  cases (v $? x).
-  cases b; cases (opt_arith e1); cases (opt_arith e2); simplify; try equality.
-  rewrite <- IHe2.
-  rewrite <- IHe1.
-  cases (n0 ==n n1).
+  cases_any.
+  assert (interp_arith (opt_binop_precompute b (opt_arith e1) (opt_arith e2)) v = interp_arith (Const n) v).
+  simplify.
+  rewrite Heq.
   equality.
+  simplify.
+  rewrite opt_binop_precompute_sound in H.
+  rewrite IHe1 in H.
+  rewrite IHe2 in H.
+  symmetry.
   equality.
-  cases b; cases (opt_arith e1); cases (opt_arith e2); simplify; try equality.
-  rewrite <- IHe2.
-  rewrite <- IHe1.
-  cases (n ==n n0).
+  assert (interp_arith (opt_binop_precompute b (opt_arith e1) (opt_arith e2)) v = interp_arith (Var x) v).
+  rewrite Heq.
   equality.
+  rewrite opt_binop_precompute_sound in H.
+  rewrite IHe1 in H.
+  rewrite IHe2 in H.
   equality.
-Admitted.
+  rewrite opt_binop_fold_sound.
+  assert (interp_arith (opt_binop_precompute b (opt_arith e1) (opt_arith e2)) v = interp_arith (Binop b0 e3 e4) v).
+  rewrite Heq.
+  equality.
+  rewrite opt_binop_precompute_sound in H.
+  rewrite IHe1 in H.
+  rewrite IHe2 in H.
+  rewrite H.
+  equality.
+Qed.
 
 (*|
 Optional: cost modeling
@@ -1077,153 +1122,185 @@ Proof.
   rewrite H1.
   apply H2.
   assumption.
-
-  admit.
-  (*cases (opt_unskip c2); cases (opt_unskip c1).
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
+  cases_any.
+  cases_any.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  try repeat eval_elim.
+  try repeat eval_intro.
   apply H5.
-  equality.
-  equality.
   apply H10.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
   apply H4.
-  apply H6.
-  eval_elim.
-  eval_elim.
-  eval_intro.
   assumption.
-  eval_intro.
+  try repeat eval_elim.
+  try repeat eval_intro.
   assumption.
-  eval_elim.
+  try repeat eval_elim.
+  try repeat eval_intro.
   assumption.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
-  equality.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
+  try repeat eval_elim.
+  assumption.
+  cases_any.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  try repeat eval_elim.
+  try repeat eval_intro.
   apply H5.
-  equality.
-  equality.
+  apply H10.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H4.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  assumption.
+  try repeat eval_intro.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply IHeval2.
+  cases_any.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H5.
+  apply H10.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H5.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H10.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H6.
+  apply H13.
+  assumption.
+  apply H5.
+  apply H10.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H5.
   apply H10.
   apply H11.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
+  apply H4.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H5.
+  apply H10.
+  apply H11.
+  try repeat eval_intro.
+  assumption.
+  try repeat eval_intro.
+  apply H5.
+  apply H10.
+  apply H11.
+  try repeat eval_intro.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H5.
+  apply H10.
+  apply H11.
+  apply IHeval2.
+  cases_any.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H4.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H4.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H4.
+  apply H7.
+  apply H5.
+  apply H10.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H5.
+  apply H8.
+  apply H4.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
   apply H4.
   apply H6.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
+  try repeat eval_intro.
+  assumption.
+  try repeat eval_intro.
+  apply H4.
+  apply H6.
+  try repeat eval_intro.
+  assumption.
+  try repeat eval_elim.
+  try repeat eval_intro.
+  apply H4.
+  apply H6.
+  apply IHeval2.
+  cases_any; try repeat eval_elim;
+    try repeat eval_intro; try assumption.
+  apply H5.
+  apply H10.
+  assumption.
+  apply H5.
+  apply H10.
+  assumption.
+  apply H10.
+  apply H4.
+  assumption.
+  apply H9.
+  apply H4.
+  assumption.
+  apply H10.
   eval_intro.
   apply H8.
-  eval_intro.
-  equality.
-  eval_intro.
-  eval_intro.
-  apply H7.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_intro.
-  apply IHeval1.
-  eval_intro.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  apply H5.
-  equality.
-  equality.
-  apply H10.
-  apply H11.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
-  equality.
-  eval_intro.
-  apply H5.
-  eval_intro.
-  eval_intro.
-  apply H10.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
-  apply H6.
-  equality.
-  equality.
-  apply H13.
-  apply H14.
-  eval_intro.
-  apply H5.
-  equality.
-  equality.
-  apply H10.
-  equality.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
-  apply H4.
-  apply H7.
-  eval_intro.
-  apply H5.
-  equality.
-  equality.
-  apply H10.
-  assumption.
-  eval_elim.
-  eval_elim.
-  eval_intro.
-  eval_intro.
   apply H9.
   eval_intro.
+  assumption.
+  apply H10.
+  eval_intro.
+  assumption.
+  apply H9.
+  eval_intro.
+  apply H7.
+  apply H8.
+  apply IHeval2.
+  apply H7.
+  apply IHeval2.
+  cases_any; try repeat eval_elim;
+    try repeat eval_intro; try assumption.
   apply H5.
-  equality.
-  equality.
   apply H10.
   assumption.
+  apply IHeval1.
+  apply H4.
+  apply H6.
+  apply IHeval1.
   eval_intro.
+  assumption.
+  apply IHeval1.
   eval_intro.
-  apply H8.
-  eval_intro.
-  apply H5.
-  equality.
-  equality.
-  apply H10.
-  equality. *)
+  assumption.
+  apply IHeval1.
+  apply IHeval2.
   apply IHeval1.
   assumption.
-Admitted.
+Qed.
 
 (*|
 Constant propagation
@@ -1376,6 +1453,100 @@ Proof.
   induct e; simplify; try equality.
 Qed.
 
+Lemma arith_constprop_in_consts_implies_expr_1 : forall e e' consts v n,
+    consts $<= v
+    -> opt_arith_constprop e consts = e'
+    -> interp_arith e  v = n
+    -> interp_arith e' v = n.
+Proof.
+  intros.
+  induct e; cases e'; simplify; try equality.
+  cases (v $? x); simplify.
+  cases (consts $? x); simplify.
+  apply includes_lookup with (m' := v) in Heq0.
+  equality.
+  equality.
+  equality.
+  cases (consts $? x); simplify.
+  apply includes_lookup with (m' := v) in Heq0.
+  equality.
+  equality.
+  equality.
+  cases_any.
+  cases (v $? x); simplify.
+  cases (consts $? x); simplify.
+  apply includes_lookup with (m' := v) in Heq0.
+  equality.
+  equality.
+  equality.
+  cases (consts $? x); simplify.
+  equality.
+  equality.
+  cases (v $? x); simplify.
+  cases (consts $? x); simplify.
+  equality.
+  equality.
+  equality.
+  cases (v $? x); simplify.
+  cases (consts $? x); simplify.
+  equality.
+  equality.
+  cases (consts $? x); simplify.
+  equality.
+  equality.
+  invert H0.
+  rewrite opt_arith_constprop_sound.
+  rewrite opt_arith_constprop_sound.
+  equality.
+  equality.
+  equality.
+Qed.
+
+Lemma arith_constprop_in_consts_implies_expr_2 : forall e e' consts v n,
+    consts $<= v
+    -> opt_arith_constprop e consts = e'
+    -> interp_arith e' v = n
+    -> interp_arith e  v = n.
+Proof.
+  intros.
+  induct e; simplify; try equality.
+  cases e'; simplify.
+  equality.
+  cases (v $? x); simplify.
+  equality.
+  equality.
+  equality.
+  cases_any.
+  cases (consts $? x); simplify.
+  apply includes_lookup with (m' := v) in Heq0.
+  rewrite <- H0 in H1.
+  simplify.
+  equality.
+  equality.
+  rewrite <- H0 in H1.
+  simplify.
+  cases (v $? x); simplify.
+  equality.
+  equality.
+  cases (consts $? x).
+  apply includes_lookup with (m' := v) in Heq0.
+  equality.
+  equality.
+  rewrite <- H0 in H1.
+  simplify.
+  cases (v $? x).
+  equality.
+  equality.
+  rewrite <- H0 in H1.
+  simplify.
+  Search (opt_arith_constprop).
+  rewrite opt_arith_constprop_sound in H1.
+  rewrite opt_arith_constprop_sound in H1.
+  equality.
+  equality.
+  equality.
+Qed.
+
 Lemma arith_constprop_in_empty_equality_implies : forall e1 e2,
     opt_arith_constprop e1 $0 = e2 -> e1 = e2.
 Proof.
@@ -1383,23 +1554,15 @@ Proof.
   induct e1; simplify; try equality.
 Qed.
 
-Lemma arith_constprop_in_consts_implies : forall e consts v n,
+Lemma arith_constprop_in_consts_implies_const : forall e consts v n,
     consts $<= v
     -> opt_arith_constprop e consts = Const n
     -> interp_arith e v = n.
 Proof.
   intros.
-  induct e; simplify; try equality.
-  cases_any.
-  cases (consts $? x).
-  apply includes_lookup with (m' := v) in Heq0.
-  equality.
-  equality.
-  equality.
-  cases (consts $? x).
-  apply includes_lookup with (m' := v) in Heq0.
-  equality.
-  equality.
+  eapply arith_constprop_in_consts_implies_expr_2.
+  apply H.
+  apply H0.
   equality.
 Qed.
 
@@ -1412,6 +1575,20 @@ Proof.
   eauto using includes_lookup.
 Qed.
 
+Lemma propagate_valuation phi : forall c c' v v1 v' v2,
+    _opt_constprop c v = (c', v')
+    -> eval phi v1 c v2
+    -> v $<= v1 -> v' $<= v2.
+Proof.
+  intros.
+  induct c; try eval_elim;
+    try eval_intro; invert H.
+  equality.
+  cases (opt_arith_constprop e v); simplify.
+  invert H2.
+  remember (interp_arith e v1).
+Admitted.
+
 Lemma _opt_constprop_sound phi : forall c consts v v',
     eval phi v c v'
     -> consts $<= v
@@ -1420,56 +1597,98 @@ Proof.
   induct c; simplify;
     try eval_elim; try eval_intro;
     try cases_any; simplify; try eval_elim;
-    try eval_intro.
+    try eval_intro; simplify.
+  apply arith_constprop_in_consts_implies_const with (v := v) in Heq.
+  equality.
+  equality.
+  cases_any.
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Var x0) v).
+  rewrite Heq.
+  equality.
+  erewrite opt_arith_constprop_sound in H.
+  rewrite H.
   simplify.
-  apply arith_constprop_in_consts_implies with (v := v) in Heq.
+  cases_any.
   equality.
   equality.
-  admit.
-  admit.
+  equality.
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Var x0) v).
+  rewrite Heq.
+  equality.
+  erewrite opt_arith_constprop_sound in H.
+  rewrite H.
+  simplify.
+  cases_any.
+  equality.
+  equality.
+  equality.
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Binop b e0_1 e0_2) v).
+  rewrite Heq.
+  equality.
+  erewrite opt_arith_constprop_sound in H.
+  rewrite H.
+  simplify.
+  equality.
+  equality.
   apply H5.
   apply H10.
+  assumption.
+  cases_any; try eval_elim; try eval_intro.
+  apply IHc1 with (consts := consts) in H4.
+  rewrite Heq in H4.
+  simplify.
+  apply H4.
   equality.
+  apply IHc2 with (consts := v0) in H6.
+  rewrite Heq0 in H6.
+  simplify.
+  assumption.
+  eapply propagate_valuation.
+  apply Heq.
+  apply H4.
+  equality.
+  cases_any; try eval_elim; try eval_intro.
+  cases (opt_arith_constprop e consts); simplify.
+  cases n.
+  eval_intro.
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith (Const 0) v).
+  rewrite Heq1.
+  equality.
+  simplify.
+  apply arith_constprop_in_consts_implies_const with (v := v) in Heq1.
+  equality.
+  equality.
+  apply IHc1 with (consts := consts) in H8.
+  rewrite Heq in H8.
+  simplify.
+  eval_intro.
+  assumption.
+  equality.
+  apply IHc1 with (consts := consts) in H8.
+  rewrite Heq in H8.
+  simplify.
   admit.
+  admit.
+  admit.
+  cases_any; try eval_elim; try eval_intro.
+  cases (opt_arith_constprop e consts); simplify.
+  admit.
+  cases (opt_arith_constprop e $0).
+  cases n; simplify.
+  eapply arith_constprop_in_empty_equality_implies in Heq0.
+  rewrite Heq0 in H.
+Admitted.
 
 Lemma opt_constprop_sound phi : forall c v v',
     eval phi v c v' ->
     eval phi v (opt_constprop c) v'.
 Proof.
   intros.
-  induct c; simplify; try eval_elim; try eval_intro.
-  cases (opt_arith_constprop e $0).
-  eval_elim.
-  eval_intro.
-  eapply arith_constprop_in_empty_equality_implies in Heq.
-  rewrite Heq.
-  equality.
-  eval_elim.
-  eval_intro.
-  eapply arith_constprop_in_empty_equality_implies in Heq.
-  rewrite Heq.
-  equality.
-  eval_elim.
-  eval_intro.
-  eapply arith_constprop_in_empty_equality_implies in Heq.
-  rewrite Heq.
-  equality.
-  apply H4.
-  equality.
-  equality.
-  apply H9.
-  equality.
-  admit.
-  simplify.
-  cases c1; cases c2; simplify;
-    try eval_elim;
-    try eval_elim;
-    try eval_intro;
-    try eval_intro.
-  rewrite arith_constprop_in_empty_is_expression.
-  cases e; try eval_elim; try eval_elim;
-    try eval_intro; try eval_intro; try equality.
-Admitted.
+  unfold opt_constprop.
+  eapply _opt_constprop_sound.
+  assumption.
+  apply empty_includes.
+Qed.
 
 (*|
 Loop unrolling
@@ -1537,7 +1756,7 @@ not write to a variable.  We'll need this to make sure that the loop body
 doesn't overwrite the loop variable.
 |*)
 
-(* HINT 3-4 (see Pset6Sig.v) *) 
+(* HINT 3-4 (see Pset6Sig.v) *)
 Fixpoint read_only (c: cmd) (x0: var) {struct c} : bool.
 Admitted.
 
