@@ -6,7 +6,6 @@ Require Import Pset7Sig.
 (* The following line forces you to use bullets or braces.  Remove it if you get
    errors like "Expected a single focused goal but 2 goals are focused." and you
    don't want to structure your proofs. *)
-Set Default Goal Selector "!".
 Set Implicit Arguments.
 
 Module Impl.
@@ -245,18 +244,25 @@ Inductive hasty : fmap var type -> exp -> type -> Prop :=
  Can you formulate a lemma to recover information similar to what inverting
  gave you in FRAP's `hasty` definition?
 
-*)
+ *)
+
+Local Hint Constructors value plug step0 step hasty : core.
 
 (* Prove these two basic algebraic properties of subtyping. *)
 
 Lemma subtype_refl : forall t1, t1 $<: t1.
 Proof.
-Admitted.
+  induct t1; simplify; eauto.
+Qed.
+
+Local Hint Resolve subtype_refl : core.
 
 (* HINT 1 (see Pset7Sig.v) *) 
 Lemma subtype_trans : forall t1 t2 t3, t1 $<: t2 -> t2 $<: t3 -> t1 $<: t3.
 Proof.
 Admitted.
+
+Local Hint Resolve subtype_trans : core.
 
 (* BEGIN handy tactic that we suggest for these proofs *)
 Ltac tac0 :=
@@ -275,9 +281,12 @@ Ltac tac0 :=
   end;
   subst.
 
-Ltac tac := simplify; subst; propositional; repeat (tac0; simplify); try equality.
+Ltac tac := simplify;
+            subst;
+            propositional;
+            repeat (tac0; simplify);
+            try equality.
 (* END handy tactic *)
-
 
 (* The real prize: prove soundness of this type system.
  * We suggest starting from a copy of the type-safety proof from the book's
@@ -292,14 +301,220 @@ Ltac tac := simplify; subst; propositional; repeat (tac0; simplify); try equalit
  * they could be solved from scratch with a good understanding of the lecture
  * material. *)
 
+Lemma value_implies_Abs G e t1 t2:
+  hasty G e (Fun t1 t2) /\ value e
+  -> exists x e', e = Abs x e'.
+Proof.
+  induct 1; tac; auto.
+  invert H0.
+  econstructor.
+  econstructor.
+  equality.
+  invert H.
+  invert H0.
+  destruct H1.
+Admitted.
+
+Local Hint Resolve value_implies_Abs : core.
+
+Lemma value_implies_TupleCons G e t1 t2:
+  hasty G e (TupleTypeCons t1 t2) /\ value e
+  -> exists e1 e2, value e1 /\ value e2 /\ e = TupleCons e1 e2.
+Proof.
+  induct 1; tac; eauto.
+  econstructor.
+  econstructor.
+Admitted.
+
+Local Hint Resolve value_implies_TupleCons : core.
+
+Lemma progress : forall e t,
+    hasty $0 e t
+    -> value e
+      \/ (exists e' : exp, step e e').
+Proof.
+  induct 1; tac; eauto.
+Admitted.
+
+Lemma weakening_override : forall (G G' : fmap var type) x t,
+    (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
+    -> (forall x' t', G $+ (x, t) $? x' = Some t'
+                -> G' $+ (x, t) $? x' = Some t').
+Proof.
+  simplify.
+  cases (x ==v x'); simplify; eauto.
+Qed.
+
+Local Hint Resolve weakening_override : core.
+
+Lemma weakening : forall G e t,
+    hasty G e t
+    -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
+            -> hasty G' e t.
+Proof.
+  induct 1; eauto.
+Qed.
+
+Local Hint Resolve weakening : core.
+
+(* Replacing a typing context with an equal one has no effect (useful to guide
+ * proof search as a hint). *)
+Lemma hasty_change : forall G e t,
+    hasty G e t
+    -> forall G', G' = G
+    -> hasty G' e t.
+Proof.
+  tac.
+Qed.
+
+Lemma hasty_TupleCons G e e' t:
+   hasty G (TupleCons e e') t ->
+   exists t1 t2, hasty G e t1 /\ hasty G e' t2 /\ TupleTypeCons t1 t2 $<: t.
+Proof.
+  induct 1; tac; eauto.
+  econstructor.
+  econstructor.
+  eauto.
+Qed.
+
+Local Hint Resolve hasty_TupleCons : core.
+
+Lemma hasty_Abs G x e t:
+  hasty G (Abs x e) t ->
+  exists t1 t2, hasty (G $+ (x, t1)) e t2 /\
+             hasty G (Abs x e) (Fun t1 t2) /\
+             Fun t1 t2 $<: t.
+Proof.
+  induct 1; tac; eauto.
+  econstructor.
+  econstructor.
+  eauto.
+  econstructor.
+  econstructor.
+  tac.
+  eauto.
+  eauto.
+  eauto.
+Qed.
+
+Local Hint Resolve hasty_Abs : core.
+
+Lemma hasty_App G e1 e2 t:
+  hasty G (App e1 e2) t ->
+  exists t1 t2, hasty G e1 (Fun t1 t2) /\
+             hasty G e2 t1 /\
+             t2 $<: t.
+Proof.
+  induct 1; tac; eauto.
+  econstructor.
+  econstructor.
+  eauto.
+Qed.
+
+Local Hint Resolve hasty_App : core.
+
+Lemma hasty_Proj G e n t:
+  hasty G (Proj e n) t ->
+  exists t' t'', hasty G e t' /\
+              proj_t t' n t'' /\
+              t'' $<: t.
+Proof.
+  induct 1; tac; eauto.
+  econstructor.
+  econstructor.
+  eauto.
+Qed.
+
+Local Hint Resolve hasty_Proj : core.
+
+Lemma substitution : forall G x x1 t' e t e',
+    hasty (G $+ (x, t')) e x1 /\ x1 $<: t
+    -> hasty $0 e' t'
+    -> hasty G (subst e' x e) t.
+Proof.
+  invert 1; tac; eauto.
+  invert H0; tac; eauto.
+Admitted.
+
+Local Hint Resolve substitution : core.
+
+Lemma preservation0 : forall e1 e2,
+    step0 e1 e2
+    -> forall t, hasty $0 e1 t
+    -> hasty $0 e2 t.
+Proof.
+  induct 1; tac; eauto.
+  eapply hasty_App in H0.
+  tac.
+  eapply hasty_Abs in H1.
+  tac.
+  eapply substitution.
+  split.
+  apply H2.
+  eauto.
+  eauto.
+  eapply hasty_Proj in H1.
+  tac.
+  eapply hasty_TupleCons in H2.
+  tac.
+  eauto.
+  eapply hasty_Proj in H1.
+  tac.
+  eapply hasty_TupleCons in H2.
+  tac.
+  eauto.
+Qed.
+
+Local Hint Resolve preservation0 : core.
+
+Lemma preservation' : forall C e1 e1',
+    plug C e1 e1'
+    -> forall e2 e2' t, plug C e2 e2'
+                  -> step0 e1 e2
+                  -> hasty $0 e1' t
+                  -> hasty $0 e2' t.
+Proof.
+  induct 1; tac; eauto.
+  eapply hasty_App in H2.
+  tac.
+  eauto.
+  eapply hasty_App in H3.
+  tac.
+  eauto.
+  eapply hasty_TupleCons in H2.
+  tac.
+  eauto.
+  eapply hasty_TupleCons in H3.
+  tac.
+  eauto.
+  eapply hasty_Proj in H2.
+  tac.
+  eauto.
+Qed.
+
+Local Hint Resolve preservation' : core.
+
+Lemma preservation : forall e1 e2,
+    step e1 e2
+    -> forall t, hasty $0 e1 t
+           -> hasty $0 e2 t.
+Proof.
+  invert 1; tac; eauto.
+Qed.
+
+Local Hint Resolve progress preservation : core.
+
 (* HINT 2-3 (see Pset7Sig.v) *) 
 Theorem safety :
   forall e t,
     hasty $0 e t -> invariantFor (trsys_of e)
-                                 (fun e' => value e'
-                                            \/ exists e'', step e' e'').
+                                (fun e' => value e'
+                                        \/ exists e'', step e' e'').
 Proof.
-Admitted.
+  simplify.
+  apply invariant_weaken with (invariant1 := fun e' => hasty $0 e' t); eauto.
+  apply invariant_induction; simplify; eauto; try equality.
+Qed.
 
 End Impl.
 
