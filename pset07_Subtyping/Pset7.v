@@ -257,9 +257,24 @@ Qed.
 
 Local Hint Resolve subtype_refl : core.
 
+Definition P t1 t2 := forall t3, t2 $<: t3 -> t1 $<: t3.
+
+Lemma subtype_trans_aux : forall t1 t2, t1 $<: t2 -> P t1 t2.
+Proof.
+  induct 1; unfold P; intros; eauto.
+  unfold P in IHsubtype1.
+  unfold P in IHsubtype2.
+  invert H1.
+Admitted.
+
+Local Hint Resolve subtype_trans_aux : core.
+
 (* HINT 1 (see Pset7Sig.v) *) 
 Lemma subtype_trans : forall t1 t2 t3, t1 $<: t2 -> t2 $<: t3 -> t1 $<: t3.
 Proof.
+  intros.
+  eapply subtype_trans_aux.
+  apply H.
 Admitted.
 
 Local Hint Resolve subtype_trans : core.
@@ -302,7 +317,8 @@ Ltac tac := simplify;
  * material. *)
 
 Lemma value_implies_Abs G e t1 t2:
-  hasty G e (Fun t1 t2) /\ value e
+  hasty G e (Fun t1 t2)
+  -> value e
   -> exists x e', e = Abs x e'.
 Proof.
   induct 1; tac; auto.
@@ -334,6 +350,43 @@ Lemma progress : forall e t,
       \/ (exists e' : exp, step e e').
 Proof.
   induct 1; tac; eauto.
+  eapply value_implies_Abs in H.
+  tac.
+  left.
+  admit.
+  equality.
+  right.
+  eapply StepRule in H5.
+  eauto.
+  eauto.
+  eauto.
+  right.
+  eapply StepRule in H5.
+  eauto.
+  eauto.
+  eauto.
+  right.
+  eapply StepRule in H7.
+  eauto.
+  eauto.
+  eauto.
+  eapply StepRule in H5.
+  eauto.
+  eauto.
+  eauto.
+  eapply StepRule in H5.
+  eauto.
+  eauto.
+  eauto.
+  eapply StepRule in H7.
+  eauto.
+  eauto.
+  eauto.
+  admit.
+  eapply StepRule in H4.
+  eauto.
+  eauto.
+  eauto.
 Admitted.
 
 Lemma weakening_override : forall (G G' : fmap var type) x t,
