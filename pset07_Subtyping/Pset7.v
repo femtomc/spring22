@@ -323,24 +323,28 @@ Lemma value_implies_Abs G e t1 t2:
 Proof.
   induct 1; tac; auto.
   invert H0.
-  econstructor.
-  econstructor.
-  equality.
-  invert H.
-  invert H0.
-  destruct H1.
-Admitted.
+  eauto.
+  invert H1.
+  invert H1.
+  eauto.
+Qed.
 
 Local Hint Resolve value_implies_Abs : core.
 
 Lemma value_implies_TupleCons G e t1 t2:
-  hasty G e (TupleTypeCons t1 t2) /\ value e
+  hasty G e (TupleTypeCons t1 t2)
+  -> value e
   -> exists e1 e2, value e1 /\ value e2 /\ e = TupleCons e1 e2.
 Proof.
   induct 1; tac; eauto.
+  invert H0.
+  invert H1.
+  invert H1.
   econstructor.
   econstructor.
-Admitted.
+  eauto.
+  invert H1.
+Qed.
 
 Local Hint Resolve value_implies_TupleCons : core.
 
@@ -352,8 +356,8 @@ Proof.
   induct 1; tac; eauto.
   eapply value_implies_Abs in H.
   tac.
-  left.
-  admit.
+  right.
+  invert H1; simplify; tac; eauto.
   equality.
   right.
   eapply StepRule in H5.
@@ -382,12 +386,22 @@ Proof.
   eauto.
   eauto.
   eauto.
-  admit.
+  invert H0.
+  eapply value_implies_TupleCons in H.
+  tac.
+  right.
+  eauto.
+  equality.
+  tac.
+  eapply value_implies_TupleCons in H.
+  tac.
+  eauto.
+  equality.
   eapply StepRule in H4.
   eauto.
   eauto.
   eauto.
-Admitted.
+Qed.
 
 Lemma weakening_override : forall (G G' : fmap var type) x t,
     (forall x' t', G $? x' = Some t' -> G' $? x' = Some t')
@@ -480,14 +494,30 @@ Qed.
 
 Local Hint Resolve hasty_Proj : core.
 
+Lemma substitution' : forall G x t' e t e',
+    hasty (G $+ (x, t')) e t
+    -> hasty $0 e' t'
+    -> hasty G (subst e' x e) t.
+Proof.
+  induct 1; tac; eauto.
+  eapply HtAbs.
+  replace (G $+ (x, t') $+ (x, t1)) with (G $+ (x, t1)) in H by sets.
+  equality.
+Qed.
+
 Lemma substitution : forall G x x1 t' e t e',
     hasty (G $+ (x, t')) e x1 /\ x1 $<: t
     -> hasty $0 e' t'
     -> hasty G (subst e' x e) t.
 Proof.
-  invert 1; tac; eauto.
-  invert H0; tac; eauto.
-Admitted.
+  intros.
+  destruct H.
+  apply substitution' with (e' := e') in H.
+  eapply HtSub.
+  apply H.
+  equality.
+  equality.
+Qed.
 
 Local Hint Resolve substitution : core.
 
