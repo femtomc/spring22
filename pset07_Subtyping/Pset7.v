@@ -257,15 +257,80 @@ Qed.
 
 Local Hint Resolve subtype_refl : core.
 
-Definition P t1 t2 := forall t3, t2 $<: t3 -> t1 $<: t3.
+Definition P t1 t2 := (forall t3, t2 $<: t3 -> t1 $<: t3 /\ (forall t', t' $<: t1 -> t' $<: t3)).
 
 Lemma subtype_trans_aux : forall t1 t2, t1 $<: t2 -> P t1 t2.
 Proof.
   induct 1; unfold P; intros; eauto.
   unfold P in IHsubtype1.
   unfold P in IHsubtype2.
+  split.
   invert H1.
-Admitted.
+  eapply StFun.
+  assert (t1' $<: t1').
+  eauto.
+  eapply IHsubtype1 in H1.
+  destruct H1.
+  eapply H2 in H4.
+  equality.
+  assert (t2' $<: t2').
+  eauto.
+  eapply IHsubtype2 in H1.
+  apply H1.
+  equality.
+  intros.
+  invert H1.
+  invert H2.
+  eapply StFun.
+  eapply IHsubtype1 in H6.
+  destruct H6.
+  eapply H2 in H5.
+  equality.
+  eapply IHsubtype2 in H8.
+  apply H8.
+  equality.
+  split.
+  equality.
+  intros.
+  invert H0.
+  equality.
+  invert H.
+  eapply StTupleNilCons.
+  split.
+  invert H.
+  eapply StTupleNilCons.
+  intros.
+  invert H0.
+  invert H.
+  eapply StTupleNilCons.
+  split.
+  unfold P in IHsubtype1.
+  unfold P in IHsubtype2.
+  invert H1.
+  eapply StTupleNilCons.
+  eapply StTupleCons.
+  eapply IHsubtype1 in H4.
+  equality.
+  eapply IHsubtype2 in H6.
+  equality.
+  intros.
+  invert H1.
+  invert H2.
+  eapply StTupleNilCons.
+  invert H2.
+  eapply StTupleCons.
+  unfold P in IHsubtype1.
+  unfold P in IHsubtype2.
+  eapply IHsubtype1 in H5.
+  destruct H5.
+  eapply H2 in H6.
+  equality.
+  unfold P in IHsubtype2.
+  eapply IHsubtype2 in H7.
+  destruct H7.
+  eapply H2 in H8.
+  equality.
+Qed.
 
 Local Hint Resolve subtype_trans_aux : core.
 
@@ -275,7 +340,9 @@ Proof.
   intros.
   eapply subtype_trans_aux.
   apply H.
-Admitted.
+  equality.
+  eauto.
+Qed.
 
 Local Hint Resolve subtype_trans : core.
 
