@@ -163,6 +163,8 @@ Inductive Confidential (pub: set var) : set var (* pc *) -> cmd (* program *) ->
     Confidential pub pc (While e body).
 (** A while loop is safe if its body is safe, noting that the body runs with additional variables in the `pc`. **)
 
+Local Hint Constructors Confidential : core.
+
 (*|
 Here are a few examples:
 |*)
@@ -235,7 +237,7 @@ Definition same_public_state pub (v1 v2: valuation) :=
  private variables holding potentially different values does not change the 
  public outputs of the program.
 
- The key difficulty is to deal with *divergence* — the cases where the two 
+ The key difficulty is to deal with *divergent_branches* — the cases where the two
  program executions take different paths.
 
  When does this happen?  How does that translate in terms of the variables
@@ -252,7 +254,202 @@ Definition same_public_state pub (v1 v2: valuation) :=
 
  *)
 
-(* HINT 1-2 (see Pset8Sig.v) *) 
+Ltac tac0 :=
+  match goal with
+  | [ H : eval _ _ _ |- _ ] => invert H
+  | [ H : Some _ = Some _ |- _ ] => invert H
+  | [ H : Confidential _ _ _ |- _ ] => invert H
+  | [ H : same_public_state _ _ _ |- _ ] => unfold same_public_state in H
+  | [ H : _ |- same_public_state _ _ _ ] => unfold same_public_state
+  end;
+  subst.
+
+Theorem restrict_nonkey : forall {K V} (k: K) (v: V) (s: set K) (m: fmap K V),
+    ~ k \in s ->
+    restrict s (m $+ (k, v)) = (restrict s m).
+Proof.
+  intros.
+  simplify.
+  maps_equal.
+  excluded_middle (k0 \in s).
+  erewrite lookup_restrict_true.
+  erewrite lookup_restrict_true.
+  eapply lookup_add_ne.
+  sets.
+  sets.
+  sets.
+  erewrite lookup_restrict_false.
+  erewrite lookup_restrict_false.
+  equality.
+  sets.
+  sets.
+Qed.
+
+Lemma valuation_switch :
+  forall e v v2 pub, restrict pub v = restrict pub v2 ->
+    vars e \subseteq pub ->
+    interp e v = interp e v2.
+Proof.
+  intros. induction e; simplify; try equality.
+  cases (v $? x).
+  cases (v2 $? x).
+  assert (restrict pub v $? x = v $? x).
+  eapply lookup_restrict_true.
+  sets.
+  rewrite <- H1 in Heq.
+  assert (restrict pub v2 $? x = v2 $? x).
+  eapply lookup_restrict_true.
+  sets.
+  rewrite <- H2 in Heq0.
+  equality.
+  assert (restrict pub v $? x = v $? x).
+  eapply lookup_restrict_true.
+  sets.
+  assert (restrict pub v2 $? x = v2 $? x).
+  eapply lookup_restrict_true.
+  sets.
+  rewrite <- H2 in Heq0.
+  equality.
+  cases (v2 $? x).
+  assert (restrict pub v $? x = v $? x).
+  eapply lookup_restrict_true.
+  sets.
+  assert (restrict pub v2 $? x = v2 $? x).
+  eapply lookup_restrict_true.
+  sets.
+  rewrite <- H2 in Heq0.
+  equality.
+  equality.
+  cases b.
+  erewrite IHe1.
+  erewrite IHe2.
+  equality.
+  sets.
+  sets.
+  erewrite IHe1.
+  erewrite IHe2.
+  equality.
+  sets.
+  sets.
+  erewrite IHe1.
+  erewrite IHe2.
+  sets.
+  sets.
+  sets.
+Qed.
+
+(* Handles divergent branches in If. *)
+Theorem divergent_branches :
+  forall c1 v1 v1',
+    eval v1 c1 v1' ->
+    forall c2 e pub v2 v2' pc,
+      eval v2 c2 v2' ->
+      Confidential pub (pc \cup vars e) c1 ->
+      Confidential pub (pc \cup vars e) c2 ->
+      interp e v1 <> interp e v2 ->
+      same_public_state pub v1 v2 ->
+      same_public_state pub v1' v2'.
+Proof.
+  induct 1; simplify.
+  invert H0.
+  unfold same_public_state.
+  unfold same_public_state in H3.
+  rewrite H3.
+Admitted.
+
+Theorem non_interference' :
+    forall c v1 v1',
+    eval v1 c v1' ->
+    forall pub v2 v2' pc,
+      eval v2 c v2' ->
+      Confidential pub pc c ->
+      same_public_state pub v1 v2 ->
+      same_public_state pub v1' v2'.
+Proof.
+  induct 1; simplify; tac0; try equality.
+  tac0.
+  tac0.
+  tac0.
+  rewrite -> restrict_nonkey.
+  rewrite -> restrict_nonkey.
+  equality.
+  equality.
+  equality.
+  tac0.
+  tac0.
+  erewrite valuation_switch with (v2 := v2).
+  excluded_middle (x \in pub).
+  rewrite Pset8Sig.Unnamed_thm.
+  rewrite Pset8Sig.Unnamed_thm.
+  equality.
+  equality.
+  equality.
+  rewrite -> restrict_nonkey.
+  rewrite -> restrict_nonkey.
+  equality.
+  equality.
+  equality.
+  apply H1.
+  equality.
+
+  eapply IHeval2.
+  apply H9.
+  invert H2.
+  apply H8.
+  eapply IHeval1.
+  apply H7.
+  invert H2.
+  apply H6.
+  equality.
+  eapply IHeval.
+  apply H10.
+  invert H2.
+  apply H6.
+  equality.
+  invert H2.
+  unfold same_public_state in H3.
+  eapply divergent_branches.
+  apply H0.
+  apply H10.
+  apply H6.
+  equality.
+  equality.
+  equality.
+  invert H2.
+  eapply divergent_branches.
+  apply H0.
+  apply H10.
+  apply H8.
+  equality.
+  equality.
+  equality.
+  invert H2.
+  eapply IHeval.
+  apply H10.
+  apply H8.
+  equality.
+
+  eapply IHeval2.
+  apply H11.
+  apply H3.
+  eapply IHeval1.
+  apply H9.
+  invert H3.
+  apply H6.
+  equality.
+  assert (H3' := H3).
+  eapply IHeval2 with (v2 := v2').
+  eapply EvalWhileFalse.
+  equality.
+  apply H3'.
+  admit.
+
+  apply EvalWhileFalse with (body := body) in H as H'.
+  invert H1.
+  unfold same_public_state in H2.
+Admitted.
+
+(* HINT 1-2 (see Pset8Sig.v) *)
 Theorem non_interference :
   forall pub c v1 v1' v2 v2',
     eval v1 c v1' ->
@@ -261,7 +458,13 @@ Theorem non_interference :
     same_public_state pub v1 v2 ->
     same_public_state pub v1' v2'.
 Proof.
-Admitted.
+  simplify.
+  eapply non_interference'.
+  apply H.
+  apply H0.
+  apply H1.
+  apply H2.
+Qed.
 
 (*|
 Congratulations, you have proved that our type system is *sound*: it catches all leaky programs!  But it is not *complete*: there are some good programs that it rejects, too.  In other words, it *overapproximates* the set of unsafe programs.
@@ -269,10 +472,20 @@ Congratulations, you have proved that our type system is *sound*: it catches all
 Can you give an example of a safe program (a program that does not leak data) that our system would reject?
 |*)
 
-Definition tricky_example : cmd. Admitted.
+Example tricky_example :=
+  ("x" <- "y" + 1;;
+   "a" <- "a" * "b";;
+   when "y" then "a" <- 0 else "b" <- 0 done).
 
 Lemma tricky_rejected : ~ Confidential pub_example {} tricky_example.
 Proof.
+  unfold tricky_example, pub_example, not; simplify.
+  invert H; simplify.
+  invert H3; simplify.
+  invert H4.
+  - sets.
+  - pose proof @subseteq_In _ "a" _ _ H4.
+    sets.
 Admitted.
 
 Lemma tricky_confidential :
