@@ -475,12 +475,43 @@ Definition max3_spec (tr: trace): Prop :=
   exists x y z,
     tr = [Out (max x (max y z)); In z; In y; In x].
 
+Global Hint Resolve Nat.max_r : core.
+Global Hint Resolve Nat.max_l : core.
+
 Theorem max3_ok:
   <{ fun/inv tr _ _ => tr = [] }>
   max3
   <{ fun/inv tr' _ _ => max3_spec tr' }>.
 Proof.
-Admitted.
+  ht.
+  unfold max3_spec.
+  exists x8. exists x5. exists x2.
+  rewrite Nat.max_r.
+  rewrite Nat.max_r.
+  ht.
+  ht.
+  ht.
+  unfold max3_spec.
+  exists x8. exists x5. exists x2.
+  rewrite Nat.max_r.
+  rewrite Nat.max_l.
+  ht.
+  ht.
+  ht.
+  unfold max3_spec.
+  exists x8. exists x5. exists x2.
+  rewrite Nat.max_r.
+  rewrite Nat.max_r.
+  ht.
+  ht.
+  ht.
+  unfold max3_spec.
+  exists x8. exists x5. exists x2.
+  ht.
+  rewrite Nat.max_l.
+  ht.
+  ht.
+Qed.
 
 (*|
 Euclidian Algorithm for GCD
@@ -511,12 +542,13 @@ Example euclidean_algorithm a b inv :=
    done;;
    output "a")%cmd.
 
+
 Definition euclidean_algorithm_invariant (a b : nat) : assertion :=
-   fun/inv _ _ _ => True.
+   fun/inv tr h v => Nat.gcd (v $! "a") (v $! "b") = Nat.gcd a b /\ tr = [].
 
 Local Hint Unfold euclidean_algorithm_invariant : core.
 
-(* HINT 1 (see Pset9Sig.v) *) 
+(* HINT 1 (see Pset9Sig.v) *)
 Theorem euclidean_algorithm_ok : forall a b,
     <{ fun/inv tr h v =>
          0 < a /\ 0 < b /\
@@ -524,9 +556,26 @@ Theorem euclidean_algorithm_ok : forall a b,
     euclidean_algorithm a b (euclidean_algorithm_invariant a b)
     <{ fun/inv tr h v =>
          v $! "a" = v $! "b"
-         /\ exists d, tr = [Out d]/\ Nat.gcd a b = d }>.
+         /\ exists d, tr = [Out d] /\ Nat.gcd a b = d }>.
 Proof.
-Admitted.
+  ht.
+  rewrite Nat.gcd_sub_diag_r.
+  ht.
+  ht.
+  ht.
+  erewrite Nat.gcd_comm.
+  rewrite Nat.gcd_sub_diag_r.
+  erewrite Nat.gcd_comm.
+  ht.
+  ht.
+  ht.
+  exists (Nat.gcd a b).
+  rewrite e in H.
+  rewrite Nat.gcd_diag in H.
+  rewrite <- H.
+  rewrite e.
+  ht.
+Qed.
 
 (*|
 Streaming Fibonacci sequence
@@ -567,7 +616,9 @@ Here's the definition of the loop invariant that you will have to modify to comp
 
 (* HINT 2 (see Pset9Sig.v) *) 
 Definition fibonacci_invariant (n: nat) : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v => exists tr',
+      fibonacci_spec (Out (v $! "y") :: Out (v $! "x") :: tr') /\
+      tr = Out (v $! "y") :: Out (v $! "x") :: tr'.
 
 Local Hint Unfold fibonacci_invariant : core.
 Local Hint Constructors fibonacci_spec : core.
@@ -577,7 +628,8 @@ Theorem fibonacci_ok (n: nat):
   fibonacci n (fibonacci_invariant n)
   <{ fun/inv tr' _ _ => fibonacci_spec tr' }>.
 Proof.
-Admitted.
+  ht.
+Qed.
 
 (*|
 Streaming factorial
@@ -609,7 +661,10 @@ Inductive fact_spec : nat -> trace -> Prop :=
     fact_spec (S n) (Out (x * S n) :: Out x :: tr).
 
 Definition fact_invariant (n: nat) : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v => exists tr',
+      (v $! "n" = n) /\ (v $! "cnt" = 0 \/ v $! "cnt" <= v $! "n") /\
+      (fact_spec (v $! "cnt") (Out (v $! "x") :: tr') /\
+  tr = Out (v $! "x") :: tr').
 
 Local Hint Unfold fact_invariant : core.
 Local Hint Constructors fact_spec : core.
@@ -620,7 +675,17 @@ Theorem fact_ok (n: nat):
   fact (fact_invariant n)
   <{ fun/inv tr' _ _ => fact_spec n tr' }>.
 Proof.
-Admitted.
+  ht.
+  assert (v $! "n" = 0).
+  linear_arithmetic.
+  rewrite H1 in H2.
+  rewrite H.
+  equality.
+  assert (v $! "cnt" = v $! "n").
+  linear_arithmetic.
+  rewrite <- H.
+  equality.
+Qed.
 
 Fixpoint fact_rec (n: nat) :=
   match n with
@@ -714,7 +779,9 @@ As always, the key part of the proof is the choice of invariant.
 |*)
 
 Definition mailbox_invariant : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v =>
+    (v $! "done" = 0 /\ mailbox_spec h tr) \/
+      (v $! "done" > 0 /\ mailbox_done h tr).
 
 Local Hint Unfold mailbox_invariant : core.
 Local Hint Constructors mailbox_spec mailbox_done : core.
@@ -725,7 +792,8 @@ Theorem mailbox_ok:
   mailbox mailbox_invariant
   <{ fun/inv tr' h' _ => mailbox_done h' tr' }>.
 Proof.
-Admitted.
+  ht.
+Qed.
 
 (*|
 Streaming search
@@ -834,11 +902,52 @@ Qed.
 You'll need to customize this invariant:
 |*)
 
+
+(*
+
+I know I'm missing some things here:
+
+Specifically, I think this is a "prelude" to the right invariant --
+but I need to make statements about h' and tr' related to tr and h.
+
+These statements will likely also cover the two branches of SearchCons.
+
+ *)
+
 Definition search_invariant (ptr: nat) (data: list nat) : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v => exists h' tr', array_at h' ptr data /\
+                           v $! "ptr" = ptr /\
+                           ( (v $! "length" = length data /\ search_spec (v $! "needle") (length data) (List.skipn (v $! "length") data) tr') \/
+                            (v $! "length" <= length data /\
+                            search_spec (v $! "needle") (v $! "length") (List.skipn (v $! "length") data) tr')).
+
+Lemma skipn_sub_app:
+  forall (data : list nat) (n : nat),
+    0 < n <= Datatypes.length data ->
+    List.skipn (n - 1) data =
+    List.nth (n - 1) data 0 :: List.skipn n data.
+Proof.
+  induct data; simplify.
+  - linear_arithmetic.
+  - assert (n = 1 \/ n - 1 = S (n - 1 - 1)) as Heq by linear_arithmetic.
+    cases Heq; rewrite Heq.
+    + reflexivity.
+    + replace n with (S (n - 1)) at 3 by linear_arithmetic.
+      simplify; apply IHdata; linear_arithmetic.
+Qed.
 
 Local Hint Unfold search_invariant : core.
 Local Hint Constructors search_spec search_done : core.
+Local Hint Resolve skipn_sub_app : core.
+Local Hint Rewrite skipn_sub_app : core.
+Local Hint Resolve skipn_O : core.
+Local Hint Rewrite skipn_O : core.
+Local Hint Resolve skipn_nil : core.
+Local Hint Rewrite skipn_nil : core.
+Local Hint Resolve skipn_all : core.
+Local Hint Rewrite skipn_all : core.
+Local Hint Resolve length_zero_iff_nil : core.
+Local Hint Rewrite length_zero_iff_nil : core.
 Arguments List.nth: simpl nomatch.
 
 (* HINT 5 (see Pset9Sig.v) *) 
@@ -853,6 +962,37 @@ Theorem search_ok ptr data:
        array_at h' ptr data /\
        search_done data tr' }>.
 Proof.
+  ht.
+  rewrite H3.
+  rewrite skipn_all.
+  ht.
+  exists x1.
+  rewrite H5.
+  ht.
+  exists x2.
+  ht.
+  rewrite H5 in H6.
+  rewrite skipn_all in H6.
+  admit.
+  admit.
+  admit.
+  admit.
+  rewrite l in H2.
+  assert (data = []).
+  erewrite <- length_zero_iff_nil.
+  equality.
+  rewrite H0.
+  ht.
+  eapply ArrayEmpty.
+  eapply SearchDone.
+  apply l.
+  admit.
+  admit.
+  eapply SearchDone.
+  apply l.
+  rewrite l in H3.
+  rewrite skipn_O in H3.
+  rewrite l.
 Admitted.
 
 (*|
