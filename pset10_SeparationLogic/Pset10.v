@@ -295,6 +295,41 @@ Definition mtreep (p : nat) : hprop :=
 
 (* Space is provided here for additional lemmas about [mtree] and [mtree']. *)
 
+Theorem mtree'_null : forall {t p},
+  p = 0 -> mtree' t 0 === [| t = Leaf |].
+Proof.
+  heq; cases t; cancel.
+Qed.
+
+Theorem mtree_null : forall p,
+  p = 0 -> mtree p === emp.
+Proof.
+  unfold mtree; simplify.
+  rewrite H.
+  setoid_rewrite (mtree'_null H).
+  heq; cancel.
+Qed.
+
+Theorem mtree'_nonnull : forall {t p},
+  p <> 0 -> mtree' t p === exists t1 t2 x p1 p2, [| t = Node t1 x t2 |]
+                                       * p |--> [p1; x; p2]
+                                       * mtree' t1 p1
+                                       * mtree' t2 p2.
+Proof.
+  heq; cases t; cancel.
+  equality.
+  invert H0. cancel.
+Qed.
+
+Theorem mtree_nonnull : forall {p},
+  p <> 0 -> mtree p === exists x p1 p2, p |--> [p1; x; p2]
+                                 * mtree p1
+                                 * mtree p2.
+Proof.
+  unfold mtree; simplify.
+  setoid_rewrite (mtree'_nonnull H).
+  heq; cancel; simplify; try equality.
+Qed.
 
 Opaque mtree.
 (* ^-- Keep predicates opaque after you've finished proving all the key
@@ -340,7 +375,66 @@ Theorem lookup_ok : forall x p,
     lookup x p
   {{ _ ~> mtreep p }}.
 Proof.
-Admitted.
+  unfold lookup.
+  unfold mtreep.
+  ht.
+  simp.
+  eapply HtConsequence.
+  eapply HtFrame.
+  instantiate (2 := mtree r).
+  instantiate (1 := fun _ => mtree r).
+  2: cancel.
+  2: {
+    simp.
+    rewrite star_comm.
+    apply exis_right with (x := r).
+    eapply star_cancel.
+    rewrite star_comm.
+    equality.
+    equality.
+  }
+  loop_inv (fun r : nat => mtree r)
+           (fun (r : nat) (_ : bool) => mtree r).
+  cases acc; simp; try step; try equality.
+  rewrite mtree_nonnull.
+  step.
+  linear_arithmetic.
+  simp.
+  cases (x ==n r0); try step; simp; try cancel.
+  assert (S acc <> 0).
+  linear_arithmetic.
+  rewrite (mtree_nonnull H).
+  apply exis_right with (x := r0).
+  apply exis_right with (x := x0).
+  apply exis_right with (x := x).
+  simp.
+  cancel.
+  cases (x <=? r0); step; simp.
+  step.
+  step.
+  apply exis_right with
+    (x := (S acc |-> r1 * exists n0 : nat, S (acc + 1 + 1) |-> n0 * mtree n0 * S (acc + 1) |-> r0)%sep).
+  cancel.
+  cancel.
+  assert (S acc <> 0).
+  linear_arithmetic.
+  eapply mtree_nonnull in H.
+  rewrite H.
+  cancel.
+  step.
+  step.
+  apply exis_right with
+    (x := (S (acc + 1 + 1) |-> r1 * exists n0 : nat, mtree n0 * S acc |-> n0 * S (acc + 1) |-> r0)%sep).
+  cancel.
+  cancel.
+  assert (S acc <> 0).
+  linear_arithmetic.
+  eapply mtree_nonnull in H.
+  rewrite H.
+  cancel.
+  cancel.
+  cancel.
+Qed.
 
 (* And here's the operation to add a new key to a tree. *)
 Definition insert (x p : nat) :=
@@ -379,6 +473,49 @@ Theorem insert_ok : forall x p,
     insert x p
   {{ _ ~> mtreep p }}.
 Proof.
+  unfold insert.
+  unfold mtreep.
+  ht.
+  eapply HtConsequence.
+  eapply HtFrame.
+  instantiate (1 := fun _ => (exists n : nat, mtree n * p |-> n)%sep).
+  instantiate (1 := (exists n : nat, mtree n * p |-> n)%sep).
+  2: cancel.
+  2: cancel.
+  loop_inv
+    (fun p : nat => (exists n : nat, mtree n * p |-> n)%sep)
+      (fun (p : nat) (_ : unit) => (exists n : nat, mtree n * p |-> n)%sep).
+  cases (r ==n 0).
+  step.
+  step.
+  step.
+  step.
+  step.
+  step.
+  cancel.
+  step.
+  cancel.
+  rewrite mtree_null.
+  rewrite star_emp_r.
+  eapply mtree_nonnull in H.
+  rewrite H.
+  cancel.
+  rewrite mtree_null.
+  rewrite star_emp_r.
+  equality.
+  equality.
+  equality.
+  ht.
+  eapply mtree_nonnull in n.
+  rewrite n.
+  cancel.
+  step.
+  simp.
+  cases (x <=? r0); simp.
+  step.
+  cancel.
+  admit.
+  cancel.
 Admitted.
 
 End Impl.
