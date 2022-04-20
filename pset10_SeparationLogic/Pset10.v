@@ -505,18 +505,29 @@ Proof.
   equality.
   equality.
   equality.
-  ht.
+  step.
   eapply mtree_nonnull in n.
   rewrite n.
   cancel.
   step.
-  simp.
   cases (x <=? r0); simp.
   step.
+  apply exis_right with
+    (x := ((r + 1) |-> r0 * exists n0 : nat, (r + 1 + 1) |-> n0 * mtree n0 * acc |-> r)%sep).
   cancel.
-  admit.
   cancel.
-Admitted.
+  rewrite H.
+  cancel.
+  step.
+  apply exis_right with
+    (x := ((r + 1) |-> r0 * exists n1 : nat, r |-> n1 * mtree n1 * acc |-> r) %sep).
+  cancel.
+  cancel.
+  rewrite H.
+  cancel.
+  cancel.
+  cancel.
+Qed.
 
 End Impl.
 
