@@ -29,6 +29,11 @@ Definition get_key (req : request) : nat :=
   | GET _ key => key
   end.
 
+Definition get_id (req : request) : nat :=
+  match req with
+  | GET client_id _ => client_id
+  end.
+
 (* There are two possible responses for a GET request: *)
 Inductive response :=
 | FOUND (client_id key value : nat)
@@ -42,9 +47,9 @@ Definition request_handler (store : fmap nat nat) (source output : channel) : pr
   | GET client_id key =>
     match store $? key with
     | Some v => !!output(FOUND client_id key v); Done
-    | None => !!output(NOT_FOUND client_id key); Done
-    end
-  end.
+| None => !!output(NOT_FOUND client_id key); Done
+end
+end.
 
 (* Key-value stores might become very large, so that they don't fit on one single
    server's disk. Therefore, we split the store into two shards:
@@ -153,6 +158,20 @@ the following steps:
 Write down the same kind of explanation of steps for the implementation (add2_once input output):
 You should get steps numbered from 1) to 5).
 
+  1) It starts as
+
+        New[input;output](intermediate)
+
+    where it creates a new channel to be used in the following processes. It registers `input` and `output` as channels which already exists, and it creates the variable `intermediate` to bind the new channel to in the following.
+
+  2) It enters the parallel composition. The first process can make progress, where it reads an input n from `input`.
+
+  3) Then, it `!!output(n + 1)` onto intermediate, and becomes Done.
+
+  4) Now the second process can make progress, where it reads
+  the value off `intermediate` (`!!output(n + 1)`, from above). Call this value `v`.
+
+  5) Then, it `!!output(v + 1)` onto the output channel, and moves to `Done`.`
 
 Question 7) In order to prove that the specification (addN 2 input output) can
 simulate the implementation (add2_once input output), we have to show that each
@@ -162,11 +181,11 @@ out the following table:
 Impl  | Spec
 state | state
 ------+------
-  1   |
-  2   |
-  3   |
-  4   |
-  5   |
+  1   | [input: nothing, output: nothing]
+  2   | [input: n, output: nothing]
+  3   | [input: n, output: nothing]
+  4   | [input: n, output: nothing]
+  5   | [input: n, output: n + 2]
 
 Question 8) If you completed the above table, you've actually just created a paper
 proof of add2_once_refines_addN. Now study the Coq proof add2_once_refines_addN,
@@ -174,7 +193,7 @@ and look at the three subgoals opened after the call to first_order.
 Where do they come from, and what does each of them ask you to prove?
 
 
-*)
+ *)
 
 (* Now you should be ready to start proving correctness!
    NOTE: You MUST use refinement ("_ <| _") and "simulates" to earn full credit on this pset.
@@ -184,8 +203,92 @@ Where do they come from, and what does each of them ask you to prove?
 
 (* HINT 1-2 (see Pset13Sig.v) *)   
 Inductive R (fs es os : fmap nat nat) (input output : channel) : proc -> proc -> Prop :=
-(* FILL IN HERE *)
-.
+| Stage0 :
+  input <> output ->
+  R fs es os input output
+    (balanced_handler es os input output)
+    (request_handler fs input output)
+
+| Stage1 : forall forward_even,
+    NoDup [input; output; forward_even] ->
+    R fs es os input output
+      (Block forward_even;
+         New [input; output; forward_even] (forward_odd);
+         request_dispatcher input forward_even forward_odd
+         || request_handler es forward_even output
+         || request_handler os forward_odd output)
+      (request_handler fs input output)
+
+| Stage2 : forall forward_even forward_odd,
+    NoDup [input; output; forward_even; forward_odd] ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+         request_dispatcher input forward_even forward_odd
+         || request_handler es forward_even output
+         || request_handler os forward_odd output)
+      (request_handler fs input output)
+
+| Stage3 :
+  forall forward_even forward_odd {req : request} key client_id,
+    NoDup [input; output; forward_even; forward_odd] ->
+    get_key req = key ->
+    get_id req = client_id ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+         (if key mod 2 ==n 0
+         then !! forward_even (req); Done
+         else !! forward_odd (req); Done)
+        || request_handler es forward_even output
+        || request_handler os forward_odd output)
+    (match fs $? key with
+    | Some v => !! output (FOUND client_id key v); Done
+    | None => !! output (NOT_FOUND client_id key); Done
+    end)
+
+| Stage4_even : forall forward_even forward_odd client_id key,
+    NoDup [input; output; forward_even; forward_odd] ->
+    key mod 2 = 0 ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+         Done || match es $? key with
+                    | Some v => !! output (FOUND client_id key v); Done
+                    | None => !! output (NOT_FOUND client_id key); Done
+                    end
+        || request_handler os forward_odd output)
+    (match fs $? key with
+    | Some v => !! output (FOUND client_id key v); Done
+    | None => !! output (NOT_FOUND client_id key); Done
+    end)
+
+| Stage4_odd : forall forward_even forward_odd client_id key,
+    NoDup [input; output; forward_even; forward_odd] ->
+    key mod 2 <> 0 ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+         Done
+        || request_handler es forward_even output
+         || match os $? key with
+                    | Some v => !! output (FOUND client_id key v); Done
+                    | None => !! output (NOT_FOUND client_id key); Done
+                end)
+    (match fs $? key with
+    | Some v => !! output (FOUND client_id key v); Done
+    | None => !! output (NOT_FOUND client_id key); Done
+    end)
+
+| Stage5_finished_even : forall forward_even forward_odd,
+    NoDup [input; output; forward_even; forward_odd] ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd; Done || Done || request_handler os forward_odd output)
+      Done
+
+| Stage5_finished_odd : forall forward_even forward_odd,
+    NoDup [input; output; forward_even; forward_odd] ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd; Done || request_handler es forward_even output || Done)
+      Done.
+
+Global Hint Constructors R : core.
 
 Definition R_alias_for_grading := R.
 (* One more hint: You can use the "lists" tactic to prove any "NoDup" goals/contradictions. *)
@@ -201,14 +304,14 @@ Ltac head e :=
 
 Ltac head_constructor e :=
   let e := eval cbv beta delta in e in (* this is quite agressive... *)
-  let h := head e in
-  is_constructor h.
+    let h := head e in
+    is_constructor h.
 
 Ltac t_step :=
   match goal with
   | |- _ => solve [propositional]
   | H : ?a = ?b |- _ => head_constructor a; head_constructor b; progress invert H
-        (* the previous case can loop because repeat invert can loop,
+  (* the previous case can loop because repeat invert can loop,
            propositional earlier prunes the cases where this occurs in our proof *)
   | H : R _ _ _  _ _  _ _ |- _ => invert H
   | H:lstep ?c _ _ |- _ => head_constructor c; (apply invert_Recv in H; try subst) || invert H
@@ -222,10 +325,150 @@ Ltac t_step :=
 
 Ltac t := repeat t_step.
 
-(* HINT 3-5 (see Pset13Sig.v) *)   
+Theorem balanced_handler_refines_request_handler :
+  forall input output fs es os,
+    split_store fs es os -> input <> output ->
+    balanced_handler es os input output <|
+      request_handler fs input output.
+Proof.
+  simplify.
+  exists (R fs es os input output).
+  first_order.
+  t.
+  eauto.
+  eauto.
+  cases (key mod 2 ==n 0).
+  t.
+  t.
+  cases (key0 mod 2 ==n 0).
+  t.
+  eauto.
+  t.
+  lists.
+  cases (key0 mod 2 ==n 0).
+  t.
+  lists.
+  t.
+  eauto.
+  cases (es $? key).
+  eexists.
+  split.
+  apply TrcRefl.
+  t.
+  t.
+  cases (es $? key).
+  invert H11.
+  lists.
+  invert H11.
+  lists.
+  cases (os $? key).
+  t.
+  t.
+  cases (os $? key).
+  invert H10.
+  lists.
+  invert H10.
+  lists.
+  eauto.
+  eauto.
+  invert H4.
+  invert H5.
+  t.
+  t.
+  eexists.
+  eexists.
+  eexists.
+  eauto.
+  split.
+  eauto.
+  unfold request_handler.
+  eauto.
+  eauto.
+  cases (get_key req mod 2 ==n 0).
+  t.
+  t.
+  cases (es $? key).
+  t.
+  cases (fs $? key).
+  erewrite H in Heq.
+  assert (n = n0).
+  equality.
+  rewrite H4.
+  eexists.
+  eexists.
+  eexists.
+  eauto.
+  t.
+  eauto.
+  eauto.
+  eauto.
+  erewrite H in Heq.
+  equality.
+  eauto.
+  t.
+  eexists.
+  eexists.
+  eexists.
+  eauto.
+  t.
+  cases (fs $? key).
+  erewrite H in Heq.
+  equality.
+  eauto.
+  eauto.
+  eauto.
+  cases (os $? key).
+  t.
+  eexists.
+  eexists.
+  eexists.
+  eauto.
+  eexists.
+  cases (fs $? key).
+  erewrite H3 in Heq.
+  assert (n = n0) by equality.
+  rewrite H4.
+  eauto.
+  eauto.
+  erewrite H3 in Heq.
+  equality.
+  eauto.
+  eauto.
+  t.
+  eexists.
+  eexists.
+  t.
+  eauto.
+  cases (fs $? key).
+  erewrite H3 in Heq.
+  equality.
+  equality.
+  eauto.
+  eauto.
+  t.
+  eexists.
+  eexists.
+  eexists.
+  eauto.
+  eexists.
+  t.
+  t.
+  eauto.
+  Unshelve.
+  eauto.
+Qed.
+
+(* HINT 3-5 (see Pset13Sig.v) *)
 Theorem balanced_handler_correct : correctness.
 Proof.
-Admitted.
+  unfold correctness.
+  simplify.
+  eapply refines_couldGenerate.
+  eapply balanced_handler_refines_request_handler.
+  eauto.
+  eauto.
+  eauto.
+Qed.
 
 (* OPTIONAL exercise (ungraded, very short):
    Another important property of refinment is that any subpart of a larger
@@ -236,11 +479,11 @@ Admitted.
    once you have found the appropariate lemma from FRAP and factored out the
    appropriate refinement claim from the last proof. *)
 Lemma multicorrectness : forall full_store even_store odd_store input output,
-  split_store full_store even_store odd_store ->
-  input <> output ->
-  forall trace,
-    couldGenerate (Dup (balanced_handler even_store odd_store input output)) trace ->
-    couldGenerate (Dup (request_handler full_store input output)) trace.
+    split_store full_store even_store odd_store ->
+    input <> output ->
+    forall trace,
+      couldGenerate (Dup (balanced_handler even_store odd_store input output)) trace ->
+      couldGenerate (Dup (request_handler full_store input output)) trace.
 Proof.
 Admitted.
 
